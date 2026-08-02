@@ -354,18 +354,22 @@ const PRESETS: Record<AuroraVariant, Preset> = {
     // No seamTop: the bloom band below IS the top-edge treatment, and a seam
     // wash over it clipped the band and left a visible horizontal line.
     layers: [
-      // one wide low-alpha multi-hue bloom band along the top edge only
+      // One wide multi-hue band bleeding down from the top edge.
+      // The gradients are anchored AT the top (`at X% 0%`) and fade out well
+      // inside the box — previously they were centred mid-box and were still
+      // visible where the box ended, which cut a hard horizontal line across
+      // the footer.
       {
         style: {
           position: 'absolute',
           insetInline: '-10%',
-          top: '-140px',
-          height: '300px',
+          top: 0,
+          height: '420px',
           background: [
-            `radial-gradient(60% 100% at 8% 50%, rgba(${AURORA_TEAL}, 0.15), transparent 70%)`,
-            `radial-gradient(60% 100% at 38% 50%, rgba(${AURORA_GOLD}, 0.15), transparent 70%)`,
-            `radial-gradient(60% 100% at 66% 50%, rgba(${AURORA_CORAL}, 0.15), transparent 70%)`,
-            `radial-gradient(60% 100% at 94% 50%, rgba(${AURORA_MAGENTA}, 0.15), transparent 70%)`,
+            `radial-gradient(46% 62% at 8% 0%, rgba(${AURORA_TEAL}, 0.16), transparent 72%)`,
+            `radial-gradient(46% 62% at 38% 0%, rgba(${AURORA_GOLD}, 0.15), transparent 72%)`,
+            `radial-gradient(46% 62% at 66% 0%, rgba(${AURORA_CORAL}, 0.15), transparent 72%)`,
+            `radial-gradient(46% 62% at 94% 0%, rgba(${AURORA_MAGENTA}, 0.16), transparent 72%)`,
           ].join(', '),
         },
       },
