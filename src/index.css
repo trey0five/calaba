@@ -1,0 +1,281 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #FFFBF5;
+  color: #2A1452;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  background: transparent;
+  position: relative;
+  z-index: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+.brand-gradient-text {
+  background: linear-gradient(
+    100deg,
+    #0E5A56 0%,
+    #B07C0F 25%,
+    #B8451F 50%,
+    #9C1F5B 75%,
+    #0E5A56 100%
+  );
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-shimmer 6s ease-in-out infinite;
+}
+
+@keyframes gradient-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Bright-stop variant for headlines sitting on dark ink fields */
+.brand-gradient-text-bright {
+  background: linear-gradient(
+    100deg,
+    #2FE0D8 0%,
+    #FFC44D 30%,
+    #FF8A6E 55%,
+    #FF6FB0 80%,
+    #2FE0D8 100%
+  );
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-shimmer 6s ease-in-out infinite;
+}
+
+@supports not (background-clip: text) {
+  /* .brand-gradient-text sits on light paper sections — fall back to ink */
+  .brand-gradient-text {
+    color: #2A1452;
+    background: none;
+    animation: none;
+  }
+  .brand-gradient-text-bright {
+    color: #F4EEFB;
+    background: none;
+    animation: none;
+  }
+}
+
+/* Native <option> lists can't inherit the glass field styling — the popup is
+   drawn by the OS, so white-on-glass text lands white-on-white. Pin the list
+   to a light popup with ink text in every browser. */
+.field-select {
+  color-scheme: light;
+}
+.field-select option {
+  background-color: #ffffff;
+  color: #2a1452;
+}
+
+/* Hero/dark-section type: lift text off a busy aurora field.
+   Plain text-shadow can't be used on gradient-clipped text (it would shadow
+   the box, not the glyphs) — those use drop-shadow filters instead. */
+.type-lift {
+  text-shadow:
+    0 1px 2px rgba(10, 4, 26, 0.35),
+    0 4px 18px rgba(10, 4, 26, 0.45),
+    0 12px 50px rgba(10, 4, 26, 0.35);
+}
+.type-lift-soft {
+  text-shadow:
+    0 1px 2px rgba(10, 4, 26, 0.3),
+    0 6px 24px rgba(10, 4, 26, 0.4);
+}
+/* Gradient word: coloured bloom + depth, applied to the clipped glyphs */
+.word-glow {
+  filter:
+    drop-shadow(0 0 26px rgba(255, 172, 120, 0.35))
+    drop-shadow(0 2px 10px rgba(10, 4, 26, 0.55));
+}
+
+/* Subtle pulsing gold glow for the primary CTA */
+@keyframes gold-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 176, 39, 0);
+  }
+  50% {
+    box-shadow: 0 0 28px 6px rgba(245, 176, 39, 0.45);
+  }
+}
+.animate-gold-pulse {
+  animation: gold-glow-pulse 2.8s ease-in-out infinite;
+}
+
+/* Slow breathing scale for ambient radial blooms */
+@keyframes bloom-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+.animate-bloom {
+  animation: bloom-pulse 9s ease-in-out infinite;
+}
+.animate-bloom-delayed {
+  animation: bloom-pulse 11s ease-in-out infinite -2s;
+}
+
+/* Gentle vertical bob for floating UI chips */
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.animate-float {
+  animation: float-y 5s ease-in-out infinite;
+}
+
+/* Long slow horizontal drift for ambient bokeh blobs */
+@keyframes drift-x-1 {
+  0%,
+  100% {
+    transform: translate(-10%, 0) scale(1);
+  }
+  50% {
+    transform: translate(40%, -8%) scale(1.05);
+  }
+}
+@keyframes drift-x-2 {
+  0%,
+  100% {
+    transform: translate(20%, 5%) scale(1);
+  }
+  50% {
+    transform: translate(-20%, -5%) scale(0.95);
+  }
+}
+@keyframes drift-x-3 {
+  0%,
+  100% {
+    transform: translate(0%, -5%) scale(0.95);
+  }
+  50% {
+    transform: translate(15%, 10%) scale(1.08);
+  }
+}
+.animate-drift-1 {
+  animation: drift-x-1 28s ease-in-out infinite;
+}
+.animate-drift-2 {
+  animation: drift-x-2 34s ease-in-out infinite;
+}
+.animate-drift-3 {
+  animation: drift-x-3 40s ease-in-out infinite;
+}
+
+/* Aurora bloom drifts — the same paths slowed way down for the
+   radial-fade blooms (0% frame is the intended static composition). */
+.animate-aurora-1 {
+  animation: drift-x-1 36s ease-in-out infinite alternate;
+}
+.animate-aurora-2 {
+  animation: drift-x-2 44s ease-in-out infinite alternate;
+}
+.animate-aurora-3 {
+  animation: drift-x-3 52s ease-in-out infinite alternate;
+}
+.animate-aurora-4 {
+  animation: drift-x-2 40s ease-in-out infinite alternate-reverse;
+}
+
+/* Static film-grain tile (inline SVG feTurbulence, never animated).
+   Opacity is set per-usage: .06 on dark fields, .045/.04 on paper. */
+.grain-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.05);
+  }
+}
+
+.animate-twinkle {
+  animation: twinkle 7s ease-in-out infinite;
+}
+
+/* Hide horizontal scrollbar while keeping native scroll (mobile carousels) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,165 @@
+<!--
+  CAL-ABA — consultation request email template (EmailJS)
+
+  SETUP
+  1. Create a free account at https://dashboard.emailjs.com and connect the
+     Gmail account Info.Calaba@gmail.com as an Email Service.
+  2. Create an Email Template, switch the editor to "Code" / HTML, and paste
+     everything below the marker line into it.
+  3. In the template's settings set:
+       To email      Info.Calaba@gmail.com
+       From name     CAL-ABA Website
+       Subject       {{subject}}
+       Reply-To      {{reply_to}}      <- lets you reply straight to the family
+  4. Copy the Service ID, Template ID and Public Key into
+     src/content/site.ts -> site.contact.emailjs
+  5. In EmailJS -> Account -> Security, add the published site's domain to the
+     allow-list (e.g. trey0five.github.io).
+
+  The logo URL below points at the deployed site. Email clients cannot read
+  local files, so it must stay an absolute https URL — update it if the site
+  moves to a custom domain.
+
+  Variables sent by the form (every one is always present; empty answers
+  arrive as an em dash so no row ever looks broken):
+    {{name}} {{email}} {{phone}} {{contact_method}} {{best_time}}
+    {{child_name}} {{child_age}} {{insurance}} {{interest}} {{message}}
+    {{submitted_at}} {{subject}} {{reply_to}}
+  ============================================================== PASTE BELOW ==
+-->
+<div style="margin:0;padding:0;background:#F6F1FB;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+    New consultation request from {{name}} — {{phone}} · {{email}}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F1FB;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(30,11,59,0.12);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+
+          <!-- Brand header: the site's night gradient -->
+          <tr>
+            <td style="background:#1C0E3E;background-image:linear-gradient(135deg,#140A2E 0%,#1C0E3E 55%,#241348 100%);padding:28px 24px;text-align:center;">
+              <img
+                src="https://trey0five.github.io/calaba/calaba2.png"
+                alt="CAL-ABA"
+                width="64"
+                height="64"
+                style="display:block;margin:0 auto 10px;width:64px;height:64px;object-fit:contain;border:0;"
+              />
+              <div style="color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:-0.2px;">
+                New consultation request
+              </div>
+              <div style="color:#B9A8D4;font-size:13px;margin-top:6px;">
+                {{submitted_at}}
+              </div>
+            </td>
+          </tr>
+
+          <!-- Accent rule in the logo colours -->
+          <tr>
+            <td style="height:4px;background:#22C7C0;background-image:linear-gradient(90deg,#22C7C0 0%,#F5B027 35%,#EE4B3C 68%,#D6337A 100%);line-height:4px;font-size:0;">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:26px 28px 8px;">
+              <p style="margin:0 0 18px;color:#2A1452;font-size:15px;line-height:1.6;">
+                <strong style="font-size:17px;">{{name}}</strong> asked to schedule a
+                consultation. They prefer to be reached by
+                <strong>{{contact_method}}</strong> — {{best_time}}.
+              </p>
+
+              <!-- CONTACT -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Contact
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:22px;">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;width:42%;">Parent / caregiver</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{name}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Email</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;font-size:14px;font-weight:600;">
+                    <a href="mailto:{{email}}" style="color:#0E5A56;text-decoration:none;">{{email}}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Phone</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;font-size:14px;font-weight:600;">
+                    <a href="tel:{{phone}}" style="color:#0E5A56;text-decoration:none;">{{phone}}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Preferred method</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{contact_method}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Best time to reach</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{best_time}}</td>
+                </tr>
+              </table>
+
+              <!-- LEARNER -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Learner
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:22px;">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;width:42%;">Child's first name</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{child_name}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Child's age</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{child_age}}</td>
+                </tr>
+              </table>
+
+              <!-- SERVICES -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Services &amp; coverage
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:22px;">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;width:42%;">Insurance</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{insurance}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Interested in</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{interest}}</td>
+                </tr>
+              </table>
+
+              <!-- MESSAGE -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Their message
+              </div>
+              <div style="background:#FBF6EC;border-left:3px solid #F5B027;border-radius:0 10px 10px 0;padding:14px 16px;color:#2A1452;font-size:14px;line-height:1.65;white-space:pre-wrap;margin-bottom:26px;">{{message}}</div>
+
+              <!-- Reply button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 8px;">
+                <tr>
+                  <td style="background:#F5B027;border-radius:999px;">
+                    <a href="mailto:{{email}}?subject=Re:%20your%20CAL-ABA%20consultation%20request"
+                       style="display:inline-block;padding:13px 30px;color:#2A1452;font-size:15px;font-weight:700;text-decoration:none;">
+                      Reply to {{name}}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background:#140A2E;padding:18px 24px;text-align:center;">
+              <div style="color:#F4EEFB;font-size:13px;font-weight:600;">CAL-ABA — Children Are Limitless</div>
+              <div style="color:#B9A8D4;font-size:12px;margin-top:4px;">
+                Sent automatically from the CAL-ABA website consultation form
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>

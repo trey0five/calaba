@@ -1,0 +1,188 @@
+<!--
+  CAL-ABA — job application email template (EmailJS)
+
+  This is the SECOND EmailJS template (the first is
+  docs/consultation-email-template.html). Create it the same way:
+
+  1. EmailJS dashboard -> Email Templates -> Create New Template.
+  2. Switch the editor to "Code" / HTML and paste everything below the marker.
+  3. Settings:
+       To email      Info.Calaba@gmail.com
+       From name     CAL-ABA Careers
+       Subject       {{subject}}
+       Reply-To      {{reply_to}}     <- reply straight to the applicant
+  4. Copy this template's ID into site.contact.emailjs.applicationTemplateId
+     (the Service ID and Public Key are shared with the consultation form).
+
+  RÉSUMÉ FILES: EmailJS only attaches files on paid plans, so the résumé is
+  uploaded to Cloudinary and the email carries a download link. Set
+  site.contact.resumeUpload.cloudName / uploadPreset with an UNSIGNED preset
+  (console.cloudinary.com -> Settings -> Upload -> Add upload preset ->
+  Signing Mode: Unsigned). Until that is set the link row reads
+  "Not uploaded — please request it from the applicant".
+
+  Variables (all always present; blanks arrive as an em dash):
+    {{name}} {{email}} {{phone}} {{dob}}
+    {{street}} {{city}} {{region}} {{postal}} {{country}} {{address_full}}
+    {{position}} {{wage}} {{right_to_work}} {{references}}
+    {{resume_name}} {{resume_link}} {{submitted_at}} {{subject}} {{reply_to}}
+  ============================================================== PASTE BELOW ==
+-->
+<div style="margin:0;padding:0;background:#F6F1FB;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+    {{position}} application from {{name}} — {{phone}} · {{email}}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F1FB;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(30,11,59,0.12);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+
+          <tr>
+            <td style="background:#1C0E3E;background-image:linear-gradient(135deg,#140A2E 0%,#1C0E3E 55%,#241348 100%);padding:28px 24px;text-align:center;">
+              <img
+                src="https://trey0five.github.io/calaba/calaba2.png"
+                alt="CAL-ABA"
+                width="72"
+                height="72"
+                style="display:block;margin:0 auto 10px;width:72px;height:72px;object-fit:contain;border:0;"
+              />
+              <div style="color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:-0.2px;">
+                New job application
+              </div>
+              <div style="display:inline-block;margin-top:10px;padding:5px 16px;border-radius:999px;background:rgba(255,196,77,0.18);border:1px solid rgba(255,196,77,0.45);color:#FFC44D;font-size:13px;font-weight:700;letter-spacing:0.6px;">
+                {{position}}
+              </div>
+              <div style="color:#B9A8D4;font-size:13px;margin-top:10px;">{{submitted_at}}</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="height:4px;background:#22C7C0;background-image:linear-gradient(90deg,#22C7C0 0%,#F5B027 35%,#EE4B3C 68%,#D6337A 100%);line-height:4px;font-size:0;">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:26px 28px 8px;">
+              <p style="margin:0 0 20px;color:#2A1452;font-size:15px;line-height:1.6;">
+                <strong style="font-size:17px;">{{name}}</strong> applied for the
+                <strong>{{position}}</strong> position.
+              </p>
+
+              <!-- RÉSUMÉ -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                CV / Résumé
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBF6EC;border-left:3px solid #F5B027;border-radius:0 10px 10px 0;margin-bottom:24px;">
+                <tr>
+                  <td style="padding:14px 16px;">
+                    <div style="color:#2A1452;font-size:14px;font-weight:700;margin-bottom:6px;">{{resume_name}}</div>
+                    <a href="{{resume_link}}" style="color:#0E5A56;font-size:13px;font-weight:600;text-decoration:underline;word-break:break-all;">{{resume_link}}</a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CONTACT -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Applicant
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;width:42%;">Name</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{name}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Email</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;font-size:14px;font-weight:600;">
+                    <a href="mailto:{{email}}" style="color:#0E5A56;text-decoration:none;">{{email}}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Phone number</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;font-size:14px;font-weight:600;">
+                    <a href="tel:{{phone}}" style="color:#0E5A56;text-decoration:none;">{{phone}}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Date of birth</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{dob}}</td>
+                </tr>
+              </table>
+
+              <!-- ADDRESS -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Address
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;width:42%;">Street address</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{street}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">City</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{city}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Region / State / Province</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{region}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Postal / ZIP code</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{postal}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Country</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{country}}</td>
+                </tr>
+              </table>
+
+              <!-- ROLE -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                Role &amp; eligibility
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;width:42%;">Position applying for</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{position}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Desired hourly / salary wage</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{wage}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#6B5A8A;font-size:13px;">Proof of legal right to work in the US</td>
+                  <td style="padding:10px 0;border-bottom:1px solid #EDE6DC;color:#2A1452;font-size:14px;font-weight:600;">{{right_to_work}}</td>
+                </tr>
+              </table>
+
+              <!-- REFERENCES -->
+              <div style="color:#9C1F5B;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px;">
+                References
+              </div>
+              <div style="background:#F6F1FB;border-left:3px solid #22C7C0;border-radius:0 10px 10px 0;padding:14px 16px;color:#2A1452;font-size:14px;line-height:1.65;white-space:pre-wrap;margin-bottom:26px;">{{references}}</div>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 8px;">
+                <tr>
+                  <td style="background:#F5B027;border-radius:999px;">
+                    <a href="mailto:{{email}}?subject=Your%20CAL-ABA%20application"
+                       style="display:inline-block;padding:13px 30px;color:#2A1452;font-size:15px;font-weight:700;text-decoration:none;">
+                      Reply to {{name}}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background:#140A2E;padding:18px 24px;text-align:center;">
+              <div style="color:#F4EEFB;font-size:13px;font-weight:600;">CAL-ABA — Children Are Limitless</div>
+              <div style="color:#B9A8D4;font-size:12px;margin-top:4px;">
+                Sent automatically from the CAL-ABA careers form
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>
