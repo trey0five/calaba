@@ -23,7 +23,7 @@ export default function Founder() {
   useEffect(() => {
     const ac = new AbortController();
     let live = true;
-    getStaff(ac.signal).then((staff) => {
+    const apply = (staff: Awaited<ReturnType<typeof getStaff>>) => {
       const f = staff?.founder;
       if (!live || !f || !f.photo?.url) return;
       setImgFailed(false);
@@ -36,7 +36,8 @@ export default function Founder() {
         title: f.title || FALLBACK.title,
         credentials: f.credentials?.length ? f.credentials : FALLBACK.credentials,
       });
-    });
+    };
+    getStaff(ac.signal, apply).then(apply);
     return () => {
       live = false;
       ac.abort();

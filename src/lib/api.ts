@@ -86,11 +86,15 @@ export async function fetchJson<T>(path: string, opts: FetchOptions = {}): Promi
 }
 
 /* ------------------------------------------------------------------ *
- * sessionStorage cache (10 minutes) — keeps repeat visits instant and
- * stops a slow API from delaying the swap on every section.
+ * sessionStorage cache — keeps repeat visits instant without letting a
+ * stale copy outlive an admin edit. Reads are stale-while-revalidate:
+ * the cached value paints immediately, a background fetch follows, and
+ * `onFresh` fires only when the server actually returned something
+ * different. A long TTL used to mean a deleted team member stayed on
+ * screen for ten minutes.
  * ------------------------------------------------------------------ */
 
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 1000;
 
 function cacheRead<T>(key: string): T | null {
   try {
@@ -199,11 +203,30 @@ function once<T>(key: string, run: () => Promise<T>): Promise<T> {
  * Approved + consented testimonials, or `null` to keep the bundled samples.
  * Only a non-empty, well-shaped array ever replaces the fallback.
  */
-export async function getTestimonials(signal?: AbortSignal): Promise<Testimonial[] | null> {
+export async function getTestimonials(
+  signal?: AbortSignal,
+  onFresh?: (data: Testimonial[]) => void,
+): Promise<Testimonial[] | null> {
   const cached = cacheRead<Testimonial[]>('calaba:testimonials');
-  if (cached && cached.length > 0) return cached;
+  if (cached && cached.length > 0) {
+    // Revalidate behind the paint; only disturb the UI on a real change.
+    if (onFresh) {
+      void fetchTestimonialsFresh().then((fresh) => {
+        if (fresh && fresh.length > 0 && !signal?.aborted &&
+            JSON.stringify(fresh) !== JSON.stringify(cached)) {
+          onFresh(fresh);
+        }
+      });
+    }
+    return cached;
+  }
 
-  const result = await once('testimonials', async () => {
+  const result = await fetchTestimonialsFresh();
+  return signal?.aborted ? null : result;
+}
+
+function fetchTestimonialsFresh(): Promise<Testimonial[] | null> {
+  return once('testimonials', async () => {
     try {
       const data = await fetchJson<unknown>('/api/public/testimonials');
       if (!Array.isArray(data) || data.length === 0) return null;
@@ -218,15 +241,32 @@ export async function getTestimonials(signal?: AbortSignal): Promise<Testimonial
       return null;
     }
   });
-  return signal?.aborted ? null : result;
 }
 
 /** Live staff, or `null` to keep the bundled team/founder. */
-export async function getStaff(signal?: AbortSignal): Promise<PublicStaff | null> {
+export async function getStaff(
+  signal?: AbortSignal,
+  onFresh?: (data: PublicStaff) => void,
+): Promise<PublicStaff | null> {
   const cached = cacheRead<PublicStaff>('calaba:staff');
-  if (cached) return cached;
+  if (cached) {
+    // Revalidate behind the paint; only disturb the UI on a real change.
+    if (onFresh) {
+      void fetchStaffFresh().then((fresh) => {
+        if (fresh && !signal?.aborted && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+          onFresh(fresh);
+        }
+      });
+    }
+    return cached;
+  }
 
-  const result = await once('staff', async () => {
+  const result = await fetchStaffFresh();
+  return signal?.aborted ? null : result;
+}
+
+function fetchStaffFresh(): Promise<PublicStaff | null> {
+  return once('staff', async () => {
     try {
       const data = await fetchJson<PublicStaff>('/api/public/staff');
       if (!data || typeof data !== 'object') return null;
@@ -243,7 +283,6 @@ export async function getStaff(signal?: AbortSignal): Promise<PublicStaff | null
       return null;
     }
   });
-  return signal?.aborted ? null : result;
 }
 
 /* ------------------------------------------------------------------ *

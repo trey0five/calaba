@@ -26,13 +26,14 @@ export default function Testimonials() {
   useEffect(() => {
     const ac = new AbortController();
     let live = true;
-    getTestimonials(ac.signal).then((items) => {
+    const apply = (items: Awaited<ReturnType<typeof getTestimonials>>) => {
       if (!live || !items || items.length === 0) return;
       setQuotes(items);
       // The live set is a different length — restart the carousel rather than
       // landing on an index that no longer exists.
       setSlide([0, 1]);
-    });
+    };
+    getTestimonials(ac.signal, apply).then(apply);
     return () => {
       live = false;
       ac.abort();

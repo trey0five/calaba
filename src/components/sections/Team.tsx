@@ -82,7 +82,7 @@ export default function Team() {
   useEffect(() => {
     const ac = new AbortController();
     let live = true;
-    getStaff(ac.signal).then((staff) => {
+    const apply = (staff: Awaited<ReturnType<typeof getStaff>>) => {
       if (!live || !staff) return;
       // Build the replacement FIRST, then decide. Checking `staff.team.length`
       // before filtering out photoless members meant a roster where every
@@ -100,7 +100,10 @@ export default function Team() {
         }));
       if (next.length === 0) return;   // keep the bundled team
       setTeam(next);
-    });
+    };
+    // Second arg revalidates behind a cached paint, so an admin edit shows up
+    // within the session instead of waiting for the cache to expire.
+    getStaff(ac.signal, apply).then(apply);
     return () => {
       live = false;
       ac.abort();
