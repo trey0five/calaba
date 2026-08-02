@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronDown, Loader2, Mail, Phone, X } from 'lucide-react';
+import { Check, Loader2, Mail, Phone, X } from 'lucide-react';
 import { site } from '@/content/site';
-import { GrainOverlay } from '@/components/primitives/AuroraField';
+import { fieldBase, Label, PANEL_BLOOMS, PanelChrome, Select } from '@/lib/ui';
 import { useConsultation } from '@/lib/dialogs';
 import { usePrefersReducedMotion, easeOutExpo } from '@/lib/motion';
 import { cn } from '@/lib/cn';
@@ -82,10 +82,6 @@ const AGES = [
   '18+ (adult services)',
 ];
 
-/** Glassy field on the ink panel. */
-const fieldBase =
-  'w-full rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3 text-base text-white placeholder:text-white/50 outline-none transition focus:border-teal-bright focus:bg-white/[0.11] focus:ring-2 focus:ring-teal-bright/30';
-
 /** (954) 599-2260 as you type. */
 function formatPhone(raw: string) {
   const d = raw.replace(/\D/g, '').slice(0, 10);
@@ -129,46 +125,6 @@ function asPlainText(v: Values) {
     '',
     `Submitted: ${new Date().toLocaleString()}`,
   ].join('\n');
-}
-
-/** Select with our own chevron — native arrows don't read on the glass field. */
-function Select({
-  id,
-  value,
-  onChange,
-  children,
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative">
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(fieldBase, 'field-select appearance-none pr-11 cursor-pointer')}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        size={18}
-        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
-        aria-hidden="true"
-      />
-    </div>
-  );
-}
-
-function Label({ htmlFor, children, required }: { htmlFor: string; children: string; required?: boolean }) {
-  return (
-    <label htmlFor={htmlFor} className="block mb-1.5 text-[13px] font-semibold text-text-light">
-      {children}
-      {required && <span className="text-gold-bright"> *</span>}
-    </label>
-  );
 }
 
 export default function ConsultationDialog() {
@@ -338,29 +294,17 @@ export default function ConsultationDialog() {
             aria-hidden="true"
           />
 
-          <motion.div
+          {/* Aurora blooms + grain live in PanelChrome — same language as the
+              page sections, shared with every other dialog and the admin. */}
+          <PanelChrome
             ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="consultation-title"
-            className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl shadow-cosmic ring-1 ring-white/10"
-            style={{
-              background:
-                'linear-gradient(180deg, #140A2E 0%, #1C0E3E 55%, #241348 100%)',
-            }}
+            className="w-full max-w-2xl my-auto"
+            blooms={PANEL_BLOOMS.teal}
             {...panelMotion}
           >
-            {/* Aurora blooms + grain, same language as the page sections */}
-            <div
-              className="pointer-events-none absolute inset-0 z-0"
-              style={{
-                background:
-                  'radial-gradient(closest-side, rgba(47,224,216,0.30), transparent 70%) -15% -10% / 65% 55% no-repeat, radial-gradient(closest-side, rgba(255,111,176,0.28), transparent 70%) 112% -6% / 62% 52% no-repeat, radial-gradient(closest-side, rgba(255,196,77,0.20), transparent 70%) 50% 112% / 80% 45% no-repeat',
-              }}
-              aria-hidden="true"
-            />
-            <GrainOverlay opacity={0.06} />
-
             {/* Header: logo + title */}
             <div className="relative z-10 px-6 sm:px-8 pt-5 pb-4 sm:pt-7 sm:pb-5 text-center">
               <button
@@ -591,7 +535,7 @@ export default function ConsultationDialog() {
                 </div>
               </form>
             )}
-          </motion.div>
+          </PanelChrome>
         </div>
       )}
     </AnimatePresence>,

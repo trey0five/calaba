@@ -5,3 +5,8 @@ dist
 .vite
 .tsbuild-node
 *.tsbuildinfo
+
+# Python / Lambda build artefacts
+__pycache__/
+*.pyc
+infra/lambda_deploy.zip

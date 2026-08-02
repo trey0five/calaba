@@ -1,0 +1,244 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CAL-ABA site API (S3 datastore + Lambda + HTTP API v2 + SES)
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: calabatherapy-site
+    Description: S3 bucket holding public staff photos and private JSON data / resumes
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    Description: HS256 signing secret for admin JWTs (generated at deploy time; never stored in the repo)
+
+  SesFromAddress:
+    Type: String
+    Default: noreply@calabatherapy.com
+    Description: Verified SES sender address
+
+  SesIdentityDomain:
+    Type: String
+    Default: calabatherapy.com
+    Description: SES domain identity that owns SesFromAddress
+
+  NotifyEmail:
+    Type: String
+    Default: admin@calabatherapy.com
+    Description: Where new review / application notifications are sent
+
+  SiteUrl:
+    Type: String
+    Default: https://calabatherapy.com
+    Description: Public site origin (used to build admin links in emails)
+
+Resources:
+
+  # ─────────────────────────────────────────────────────────────
+  # Storage
+  # ─────────────────────────────────────────────────────────────
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        # ACLs stay blocked; the bucket policy below is the ONLY way anything
+        # becomes public, and it is scoped to public/* .
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - https://calabatherapy.com
+              - https://www.calabatherapy.com
+              - http://localhost:5175
+              - http://localhost:5173
+            AllowedMethods: [GET, PUT, POST]
+            AllowedHeaders: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 3600
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-incoming-resumes
+            Status: Enabled
+            Prefix: private/resumes/incoming/
+            ExpirationInDays: 7
+          - Id: expire-noncurrent-versions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 90
+          - Id: abort-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadPublicPrefixOnly
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub '${SiteBucket.Arn}/public/*'
+
+  # ─────────────────────────────────────────────────────────────
+  # Compute
+  # ─────────────────────────────────────────────────────────────
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: calaba-site-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: calaba-site-s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  # "Delete forever" must actually delete forever: the bucket is
+                  # versioned, so without DeleteObjectVersion a deleted resume
+                  # stays readable as a noncurrent version for 90 days.
+                  - s3:DeleteObjectVersion
+                Resource: !Sub '${SiteBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:ListBucketVersions
+                Resource: !GetAtt SiteBucket.Arn
+        - PolicyName: calaba-site-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+        - PolicyName: calaba-site-ses
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource:
+                  - !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SesIdentityDomain}'
+                  - !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SesFromAddress}'
+
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: calaba-site-api
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      # Caps blast radius (and cost) if the public endpoints are ever hammered.
+      ReservedConcurrentExecutions: 20
+      Code:
+        ZipFile: |
+          # Placeholder - real code is shipped by ./deploy.sh code
+          def lambda_handler(event, context):
+              return {'statusCode': 503, 'body': '{"error":"Code not deployed yet"}'}
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref SiteBucket
+          JWT_SECRET: !Ref JwtSecret
+          SES_FROM: !Ref SesFromAddress
+          NOTIFY_EMAIL: !Ref NotifyEmail
+          SITE_URL: !Ref SiteUrl
+
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/calaba-site-api
+      RetentionInDays: 90
+
+  # ─────────────────────────────────────────────────────────────
+  # HTTP API (payload format 1.0 — handler reads httpMethod/path)
+  # ─────────────────────────────────────────────────────────────
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: calaba-site-api
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - https://calabatherapy.com
+          - https://www.calabatherapy.com
+          - http://localhost:5175
+          - http://localhost:5173
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
+        AllowHeaders: [Content-Type, Authorization]
+        MaxAge: 86400
+
+  ApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: '1.0'
+
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: '$default'
+      Target: !Sub 'integrations/${ApiIntegration}'
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: '$default'
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingRateLimit: 20
+        ThrottlingBurstLimit: 40
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*'
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the site API (set as VITE_API_URL)
+    Value: !GetAtt HttpApi.ApiEndpoint
+  BucketName:
+    Description: S3 bucket for site data and assets
+    Value: !Ref SiteBucket
+  PublicAssetBase:
+    Description: Public base URL for staff photos
+    Value: !Sub 'https://${SiteBucket}.s3.amazonaws.com/public/'
+  LambdaFunctionName:
+    Description: Lambda function name for code deploys
+    Value: !Ref ApiFunction

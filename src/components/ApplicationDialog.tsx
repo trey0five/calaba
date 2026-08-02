@@ -1,9 +1,16 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronDown, FileText, Loader2, Paperclip, X } from 'lucide-react';
+import { Check, FileText, Loader2, Paperclip, X } from 'lucide-react';
 import { site } from '@/content/site';
-import { GrainOverlay } from '@/components/primitives/AuroraField';
+import { fieldBase, Label, PANEL_BLOOMS, PanelChrome, Select } from '@/lib/ui';
+import {
+  ApiError,
+  getResumeUploadUrl,
+  MIN_FORM_AGE_MS,
+  postApplication,
+  uploadToS3,
+} from '@/lib/api';
 import { useApplication } from '@/lib/dialogs';
 import { usePrefersReducedMotion, easeOutExpo } from '@/lib/motion';
 import { cn } from '@/lib/cn';
@@ -62,9 +69,6 @@ const POSITIONS = ['RBT', 'BCaBA', 'BCBA'];
 const MAX_RESUME_MB = 5;
 const RESUME_TYPES = ['.pdf', '.doc', '.docx', '.rtf', '.txt'];
 
-const fieldBase =
-  'w-full rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3 text-base text-white placeholder:text-white/50 outline-none transition focus:border-teal-bright focus:bg-white/[0.11] focus:ring-2 focus:ring-teal-bright/30';
-
 function formatPhone(raw: string) {
   const d = raw.replace(/\D/g, '').slice(0, 10);
   if (d.length <= 3) return d;
@@ -81,41 +85,6 @@ function prettyDate(iso: string) {
     month: 'long',
     day: 'numeric',
   });
-}
-
-/** Every field, blanks included, so nothing silently goes missing. */
-function templateParams(v: Values, resumeLink: string, resumeName: string) {
-  const filled = (s: string) => (s.trim() ? s.trim() : '—');
-  return {
-    name: filled(v.name),
-    email: filled(v.email),
-    phone: filled(v.phone),
-    dob: filled(prettyDate(v.dob)),
-    street: filled(v.street),
-    city: filled(v.city),
-    region: filled(v.region),
-    postal: filled(v.postal),
-    country: filled(v.country),
-    address_full: [
-      v.street.trim(),
-      [v.city.trim(), v.region.trim()].filter(Boolean).join(', '),
-      [v.postal.trim(), v.country.trim()].filter(Boolean).join(' '),
-    ]
-      .filter(Boolean)
-      .join('\n') || '—',
-    position: filled(v.position),
-    wage: filled(v.wage),
-    right_to_work: filled(v.rightToWork),
-    references: filled(v.references),
-    resume_name: resumeName || 'No file attached',
-    resume_link: resumeLink || 'Not uploaded — please request it from the applicant',
-    submitted_at: new Date().toLocaleString('en-US', {
-      dateStyle: 'full',
-      timeStyle: 'short',
-    }),
-    reply_to: v.email.trim(),
-    subject: `Job application — ${v.position || 'Applicant'} — ${v.name.trim()}`,
-  };
 }
 
 function asPlainText(v: Values, resumeLink: string, resumeName: string) {
@@ -135,15 +104,6 @@ function asPlainText(v: Values, resumeLink: string, resumeName: string) {
     '',
     `Submitted: ${new Date().toLocaleString()}`,
   ].join('\n');
-}
-
-function Label({ htmlFor, children, required }: { htmlFor: string; children: string; required?: boolean }) {
-  return (
-    <label htmlFor={htmlFor} className="block mb-1.5 text-[13px] font-semibold text-text-light">
-      {children}
-      {required && <span className="text-gold-bright"> *</span>}
-    </label>
-  );
 }
 
 function Field({
@@ -180,6 +140,11 @@ export default function ApplicationDialog() {
   const [resume, setResume] = useState<File | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof Values | 'resume', string>>>({});
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle');
+  /** Sub-step of `sending`, so the button can name what is happening. */
+  const [phase, setPhase] = useState<'idle' | 'uploading' | 'sending'>('idle');
+  /* Spam traps: a field no human sees, and the moment the form opened. */
+  const [company, setCompany] = useState('');
+  const formOpenedAt = useRef(0);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -202,6 +167,7 @@ export default function ApplicationDialog() {
 
   useEffect(() => {
     if (!open) return;
+    formOpenedAt.current = Date.now();
     returnFocusRef.current = document.activeElement;
     const { overflow, paddingRight } = document.body.style;
     const gap = window.innerWidth - document.documentElement.clientWidth;
@@ -249,6 +215,7 @@ export default function ApplicationDialog() {
     const t = window.setTimeout(() => {
       setValues(EMPTY);
       setResume(null);
+      setCompany('');
       setStatus('idle');
     }, 400);
     return () => window.clearTimeout(t);
@@ -302,22 +269,6 @@ export default function ApplicationDialog() {
     return Object.keys(next).length === 0;
   };
 
-  /** Cloudinary unsigned upload -> shareable link for the email. */
-  const uploadResume = async (file: File): Promise<string> => {
-    const { cloudName, uploadPreset } = site.contact.resumeUpload;
-    if (!cloudName || !uploadPreset) return '';
-    const body = new FormData();
-    body.append('file', file);
-    body.append('upload_preset', uploadPreset);
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-      method: 'POST',
-      body,
-    });
-    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-    const json = (await res.json()) as { secure_url?: string };
-    return json.secure_url ?? '';
-  };
-
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (status === 'sending') return;
@@ -335,48 +286,87 @@ export default function ApplicationDialog() {
     }
     setStatus('sending');
 
-    const { emailjs, formEndpoint } = site.contact;
-    let resumeLink = '';
-    try {
-      if (resume) resumeLink = await uploadResume(resume);
-    } catch {
-      /* keep going — the email will say the résumé still needs collecting */
-    }
-
-    const params = templateParams(values, resumeLink, resume?.name ?? '');
+    const subject = `Job application — ${values.position || 'Applicant'} — ${values.name.trim()}`;
     const mailFallback = () => {
+      // Never a link: the résumé lives in a private bucket, so the fallback
+      // email asks the applicant to send the file directly.
       window.location.href = `mailto:${site.contact.email}?subject=${encodeURIComponent(
-        params.subject,
-      )}&body=${encodeURIComponent(asPlainText(values, resumeLink, resume?.name ?? ''))}`;
+        subject,
+      )}&body=${encodeURIComponent(asPlainText(values, '', resume?.name ?? ''))}`;
     };
 
-    try {
-      if (emailjs.serviceId && emailjs.applicationTemplateId && emailjs.publicKey) {
-        const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            service_id: emailjs.serviceId,
-            template_id: emailjs.applicationTemplateId,
-            user_id: emailjs.publicKey,
-            template_params: params,
-          }),
+    const spam = {
+      company,
+      formOpenedAt: formOpenedAt.current || Date.now() - MIN_FORM_AGE_MS,
+    };
+
+    /* Three steps, because a 5MB résumé base64s to ~6.9MB — past Lambda's 6MB
+       synchronous payload ceiling. The file goes browser -> S3 direct.
+
+       The upload gets its OWN try/catch. Wrapping all three steps together
+       meant a rejected file name (or a flaky S3 PUT) skipped straight to the
+       "thank you" screen with no record stored anywhere. */
+    let uploadId: string | null = null;
+    /* The server sanitises the filename and bakes it into the S3 key, so the
+       application POST has to echo the server's version back verbatim. */
+    let storedName: string | undefined;
+
+    if (resume) {
+      setPhase('uploading');
+      try {
+        const ticket = await getResumeUploadUrl({
+          filename: resume.name,
+          contentType: resume.type || 'application/octet-stream',
+          size: resume.size,
+          ...spam,
         });
-        if (!res.ok) throw new Error(`EmailJS responded ${res.status}`);
-      } else if (formEndpoint) {
-        const res = await fetch(formEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ ...params, _subject: params.subject }),
-        });
-        if (!res.ok) throw new Error(`Form endpoint responded ${res.status}`);
-      } else {
-        mailFallback();
+        if (ticket.uploadId && ticket.url) {
+          await uploadToS3(ticket, resume);
+          uploadId = ticket.uploadId;
+          storedName = ticket.filename ?? resume.name;
+        }
+      } catch (err) {
+        // A 4xx from /upload-url means the FILE was refused (bad name, bad
+        // extension, too large). Sending the application without it would lose
+        // the résumé silently, so send the applicant back to the field.
+        if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+          setPhase('idle');
+          setStatus('idle');
+          setErrors((prev) => ({
+            ...prev,
+            resume:
+              err.status === 413 || /5 MB|too large/i.test(err.message)
+                ? err.message
+                : 'We couldn’t accept that file name. Please rename your résumé using letters and numbers (for example resume.pdf) and attach it again.',
+          }));
+          window.setTimeout(() => {
+            const bad = panelRef.current?.querySelector<HTMLElement>('.border-coral-bright');
+            bad?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 0);
+          return;
+        }
+        // Anything else (network blip, S3 PUT failure) — the application itself
+        // is far more valuable than the attachment, so it still goes through
+        // with resume:null. The orphaned incoming object, if any, is reaped by
+        // the 7-day lifecycle rule.
+        uploadId = null;
+        storedName = undefined;
       }
+    }
+
+    try {
+      setPhase('sending');
+      await postApplication({
+        values,
+        ...(uploadId ? { uploadId, filename: storedName } : {}),
+        ...spam,
+      });
     } catch {
+      // Reserved for a genuine failure to store the application.
       mailFallback();
     }
 
+    setPhase('idle');
     setStatus('done');
   };
 
@@ -403,24 +393,15 @@ export default function ApplicationDialog() {
             aria-hidden="true"
           />
 
-          <motion.div
+          <PanelChrome
             ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="application-title"
-            className="relative w-full max-w-3xl my-auto overflow-hidden rounded-3xl shadow-cosmic ring-1 ring-white/10"
-            style={{ background: 'linear-gradient(180deg, #140A2E 0%, #1C0E3E 55%, #241348 100%)' }}
+            className="w-full max-w-3xl my-auto"
+            blooms={PANEL_BLOOMS.application}
             {...panelMotion}
           >
-            <div
-              className="pointer-events-none absolute inset-0 z-0"
-              style={{
-                background:
-                  'radial-gradient(closest-side, rgba(47,224,216,0.30), transparent 70%) -15% -10% / 65% 55% no-repeat, radial-gradient(closest-side, rgba(255,196,77,0.26), transparent 70%) 112% -6% / 62% 52% no-repeat, radial-gradient(closest-side, rgba(255,111,176,0.20), transparent 70%) 50% 112% / 80% 45% no-repeat',
-              }}
-              aria-hidden="true"
-            />
-            <GrainOverlay opacity={0.06} />
 
             <div className="relative z-10 px-6 sm:px-8 pt-5 pb-4 sm:pt-7 sm:pb-5 text-center">
               <button
@@ -482,6 +463,19 @@ export default function ApplicationDialog() {
               </div>
             ) : (
               <form onSubmit={onSubmit} noValidate className="relative z-10 px-6 sm:px-8 pb-7 pt-1">
+                {/* Honeypot — off-screen, unlabelled, skipped by keyboard and
+                    autofill. Anything typed here is a bot. */}
+                <div className="absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden" aria-hidden="true">
+                  <input
+                    type="text"
+                    name="company"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field id="a-name" label="Name" required error={errors.name} className="sm:col-span-2">
                     <input
@@ -532,24 +526,17 @@ export default function ApplicationDialog() {
                   </Field>
 
                   <Field id="a-position" label="Which position are you interested in?" required error={errors.position}>
-                    <div className="relative">
-                      <select
-                        id="a-position"
-                        value={values.position}
-                        onChange={(e) => set('position', e.target.value)}
-                        className={cn(fieldBase, 'field-select appearance-none pr-11 cursor-pointer', errors.position && 'border-coral-bright')}
-                      >
-                        <option value="">Select a position</option>
-                        {POSITIONS.map((p) => (
-                          <option key={p}>{p}</option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        size={18}
-                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
-                        aria-hidden="true"
-                      />
-                    </div>
+                    <Select
+                      id="a-position"
+                      value={values.position}
+                      onChange={(v) => set('position', v)}
+                      invalid={!!errors.position}
+                    >
+                      <option value="">Select a position</option>
+                      {POSITIONS.map((p) => (
+                        <option key={p}>{p}</option>
+                      ))}
+                    </Select>
                   </Field>
 
                   <Field id="a-street" label="Street address" required error={errors.street} className="sm:col-span-2">
@@ -622,23 +609,16 @@ export default function ApplicationDialog() {
                     required
                     error={errors.rightToWork}
                   >
-                    <div className="relative">
-                      <select
-                        id="a-rtw"
-                        value={values.rightToWork}
-                        onChange={(e) => set('rightToWork', e.target.value)}
-                        className={cn(fieldBase, 'field-select appearance-none pr-11 cursor-pointer', errors.rightToWork && 'border-coral-bright')}
-                      >
-                        <option value="">Select an answer</option>
-                        <option>Yes</option>
-                        <option>No</option>
-                      </select>
-                      <ChevronDown
-                        size={18}
-                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
-                        aria-hidden="true"
-                      />
-                    </div>
+                    <Select
+                      id="a-rtw"
+                      value={values.rightToWork}
+                      onChange={(v) => set('rightToWork', v)}
+                      invalid={!!errors.rightToWork}
+                    >
+                      <option value="">Select an answer</option>
+                      <option>Yes</option>
+                      <option>No</option>
+                    </Select>
                   </Field>
 
                   <Field
@@ -719,7 +699,7 @@ export default function ApplicationDialog() {
                     {status === 'sending' ? (
                       <>
                         <Loader2 size={18} className="animate-spin" />
-                        Sending…
+                        {phase === 'uploading' ? 'Uploading résumé…' : 'Sending…'}
                       </>
                     ) : (
                       'Submit application'
@@ -728,7 +708,7 @@ export default function ApplicationDialog() {
                 </div>
               </form>
             )}
-          </motion.div>
+          </PanelChrome>
         </div>
       )}
     </AnimatePresence>,

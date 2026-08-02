@@ -1,18 +1,29 @@
 import logoUrl from '@/assets/calaba2.png';
+import { API_BASE } from '@/lib/api';
 
 export const site = {
   brand: 'CAL-ABA',
   logo: logoUrl,
+  /**
+   * The site API (reviews, applications, staff photos, admin). Overridable at
+   * build time with VITE_API_URL — see src/lib/api.ts, which owns the actual
+   * constant so the fallback can never drift between the two.
+   */
+  api: {
+    baseUrl: API_BASE,
+    /** Where the owner signs in. Emailed links point here. */
+    adminPath: '#/admin',
+  },
   contact: {
     email: 'admin@calabatherapy.com',
     phone: '(954) 599-2260',
     /**
-     * Consultation-form delivery. GitHub Pages is static, so the browser has
-     * to hand off to a service. Tried in order; the first one configured wins,
-     * and if none are set the form falls back to a pre-filled email so no
-     * enquiry is ever lost.
+     * Consultation-form delivery. Reviews and job applications now POST to the
+     * site API; the consultation form still hands off to a mail service because
+     * it has no record to store. Tried in order, and if neither is configured
+     * the form falls back to a pre-filled email so no enquiry is ever lost.
      *
-     * 1. EmailJS — preferred: delivers the branded HTML template in
+     * 1. EmailJS — delivers the branded HTML template in
      *    docs/consultation-email-template.html (logo + every field laid out).
      *    Fill all three values from https://dashboard.emailjs.com.
      * 2. formEndpoint — any Formspree/Web3Forms style JSON endpoint.
@@ -21,26 +32,9 @@ export const site = {
       serviceId: '',
       /** consultation form -> docs/consultation-email-template.html */
       templateId: '',
-      /** job application form -> docs/application-email-template.html */
-      applicationTemplateId: '',
-      /** review submissions -> docs/review-email-template.html */
-      reviewTemplateId: '',
       publicKey: '',
     },
     formEndpoint: '',
-    /**
-     * Résumé hosting for the job-application form. GitHub Pages can't receive
-     * files, and email services only attach on paid plans — so the file is
-     * uploaded to Cloudinary (free tier, unsigned preset) and the email
-     * carries a download link. Create an unsigned upload preset at
-     * https://console.cloudinary.com -> Settings -> Upload.
-     * While these are empty the form still submits; the email says the résumé
-     * needs to be requested from the applicant.
-     */
-    resumeUpload: {
-      cloudName: '',
-      uploadPreset: '',
-    },
     hours: 'Mon-Fri 8am-6pm',
   },
   navLinks: [

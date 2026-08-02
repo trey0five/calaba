@@ -25,7 +25,10 @@ export type AuroraVariant =
   | 'blog'
   | 'careers'
   | 'contact'
-  | 'footer';
+  | 'footer'
+  /* Admin SPA — mounted once behind the whole app, never per route. */
+  | 'admin'
+  | 'adminLogin';
 
 interface AuroraFieldProps {
   variant: AuroraVariant;
@@ -344,6 +347,48 @@ const PRESETS: Record<AuroraVariant, Preset> = {
       },
       {
         style: bloomStyle(AURORA_CORAL, 0.12, 'max(34vw, 300px)', { left: '-8%', bottom: '-16%' }),
+        anim: 'animate-aurora-4',
+      },
+    ],
+  },
+  // Admin working surface: quiet enough to read dense lists over.
+  admin: {
+    field: 'linear-gradient(180deg, #140A2E 0%, #1C0E3E 60%, #241348 100%)',
+    grain: 0.05,
+    layers: [
+      {
+        style: bloomStyle(AURORA_TEAL, 0.16, 'max(46vw, 400px)', { left: '-14%', top: '-10%' }),
+        anim: 'animate-aurora-1',
+      },
+      {
+        style: bloomStyle(AURORA_MAGENTA, 0.14, 'max(46vw, 400px)', { right: '-14%', top: '4%' }),
+        anim: 'animate-aurora-2',
+      },
+      {
+        style: bloomStyle(AURORA_GOLD, 0.12, 'max(44vw, 380px)', { left: '30%', bottom: '-22%' }),
+        anim: 'animate-aurora-3',
+      },
+    ],
+  },
+  // Login: the same composition turned up, plus a fourth coral bloom.
+  adminLogin: {
+    field: 'linear-gradient(180deg, #140A2E 0%, #1C0E3E 60%, #241348 100%)',
+    grain: 0.05,
+    layers: [
+      {
+        style: bloomStyle(AURORA_TEAL, 0.34, 'max(46vw, 400px)', { left: '-14%', top: '-10%' }),
+        anim: 'animate-aurora-1',
+      },
+      {
+        style: bloomStyle(AURORA_MAGENTA, 0.3, 'max(46vw, 400px)', { right: '-14%', top: '4%' }),
+        anim: 'animate-aurora-2',
+      },
+      {
+        style: bloomStyle(AURORA_GOLD, 0.26, 'max(44vw, 380px)', { left: '30%', bottom: '-22%' }),
+        anim: 'animate-aurora-3',
+      },
+      {
+        style: bloomStyle(AURORA_CORAL, 0.22, 'max(34vw, 300px)', { right: '-8%', bottom: '-12%' }),
         anim: 'animate-aurora-4',
       },
     ],

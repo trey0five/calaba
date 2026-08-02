@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronDown, Loader2, Star, X } from 'lucide-react';
+import { Check, Loader2, Star, X } from 'lucide-react';
 import { site } from '@/content/site';
 import { SERVICES } from '@/content/services';
-import { GrainOverlay } from '@/components/primitives/AuroraField';
+import { fieldBase, Label, PANEL_BLOOMS, PanelChrome, Select } from '@/lib/ui';
+import { MIN_FORM_AGE_MS, postReview } from '@/lib/api';
 import { useReview } from '@/lib/dialogs';
 import { usePrefersReducedMotion, easeOutExpo } from '@/lib/motion';
 import { cn } from '@/lib/cn';
@@ -57,33 +58,7 @@ const RELATIONSHIPS = [
   'Team member',
 ];
 
-const fieldBase =
-  'w-full rounded-xl border border-white/15 bg-white/[0.07] px-4 py-3 text-base text-white placeholder:text-white/50 outline-none transition focus:border-teal-bright focus:bg-white/[0.11] focus:ring-2 focus:ring-teal-bright/30';
-
 const RATING_WORDS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'];
-
-function templateParams(v: Values, rating: number, consent: boolean) {
-  const filled = (s: string) => (s.trim() ? s.trim() : '—');
-  return {
-    name: filled(v.name),
-    credit: filled(v.credit),
-    email: filled(v.email),
-    relationship: filled(v.relationship),
-    location: filled(v.location),
-    service: filled(v.service),
-    headline: filled(v.headline),
-    review: filled(v.review),
-    rating: `${rating} / 5 — ${RATING_WORDS[rating]}`,
-    stars: '★'.repeat(rating) + '☆'.repeat(5 - rating),
-    consent: consent ? 'YES — may be published on the website' : 'NO — private feedback only',
-    submitted_at: new Date().toLocaleString('en-US', {
-      dateStyle: 'full',
-      timeStyle: 'short',
-    }),
-    reply_to: v.email.trim(),
-    subject: `New ${rating}-star review — ${v.name.trim() || 'Anonymous'}`,
-  };
-}
 
 function asPlainText(v: Values, rating: number, consent: boolean) {
   const lines = FIELD_LABELS.map(([key, label]) => {
@@ -101,51 +76,6 @@ function asPlainText(v: Values, rating: number, consent: boolean) {
   ].join('\n');
 }
 
-function Label({ htmlFor, children, required }: { htmlFor: string; children: string; required?: boolean }) {
-  return (
-    <label htmlFor={htmlFor} className="block mb-1.5 text-[13px] font-semibold text-text-light">
-      {children}
-      {required && <span className="text-gold-bright"> *</span>}
-    </label>
-  );
-}
-
-function Select({
-  id,
-  value,
-  onChange,
-  invalid,
-  children,
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  invalid?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative">
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          fieldBase,
-          'field-select appearance-none pr-11 cursor-pointer',
-          invalid && 'border-coral-bright',
-        )}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        size={18}
-        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60"
-        aria-hidden="true"
-      />
-    </div>
-  );
-}
-
 export default function ReviewDialog() {
   const { open, closeDialog } = useReview();
   const reduced = usePrefersReducedMotion();
@@ -154,6 +84,9 @@ export default function ReviewDialog() {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [consent, setConsent] = useState(true);
+  /* Spam traps: a field no human sees, and the moment the form opened. */
+  const [company, setCompany] = useState('');
+  const formOpenedAt = useRef(0);
   const [errors, setErrors] = useState<Partial<Record<keyof Values | 'rating', string>>>({});
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle');
 
@@ -168,6 +101,7 @@ export default function ReviewDialog() {
 
   useEffect(() => {
     if (!open) return;
+    formOpenedAt.current = Date.now();
     returnFocusRef.current = document.activeElement;
     const { overflow, paddingRight } = document.body.style;
     const gap = window.innerWidth - document.documentElement.clientWidth;
@@ -216,6 +150,7 @@ export default function ReviewDialog() {
       setValues(EMPTY);
       setRating(0);
       setConsent(true);
+      setCompany('');
       setStatus('idle');
     }, 400);
     return () => window.clearTimeout(t);
@@ -252,38 +187,34 @@ export default function ReviewDialog() {
     }
     setStatus('sending');
 
-    const { emailjs, formEndpoint } = site.contact;
-    const params = templateParams(values, rating, consent);
+    const subject = `New ${rating}-star review — ${values.name.trim() || 'Anonymous'}`;
     const mailFallback = () => {
       window.location.href = `mailto:${site.contact.email}?subject=${encodeURIComponent(
-        params.subject,
+        subject,
       )}&body=${encodeURIComponent(asPlainText(values, rating, consent))}`;
     };
 
     try {
-      if (emailjs.serviceId && emailjs.reviewTemplateId && emailjs.publicKey) {
-        const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            service_id: emailjs.serviceId,
-            template_id: emailjs.reviewTemplateId,
-            user_id: emailjs.publicKey,
-            template_params: params,
-          }),
-        });
-        if (!res.ok) throw new Error(`EmailJS responded ${res.status}`);
-      } else if (formEndpoint) {
-        const res = await fetch(formEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ ...params, _subject: params.subject }),
-        });
-        if (!res.ok) throw new Error(`Form endpoint responded ${res.status}`);
-      } else {
-        mailFallback();
-      }
+      /* A silent spam drop still answers 200 {ok:true,id:null} — the sender
+         must never learn which submissions were dropped, so we treat it
+         exactly like a success. */
+      await postReview({
+        rating,
+        headline: values.headline.trim(),
+        review: values.review.trim(),
+        name: values.name.trim(),
+        credit: values.credit,
+        email: values.email.trim(),
+        relationship: values.relationship,
+        location: values.location.trim(),
+        service: values.service,
+        consent,
+        company,
+        formOpenedAt: formOpenedAt.current || Date.now() - MIN_FORM_AGE_MS,
+      });
     } catch {
+      // API unreachable / rate-limited — hand off to the mail client so the
+      // review still reaches the inbox.
       mailFallback();
     }
 
@@ -315,24 +246,15 @@ export default function ReviewDialog() {
             aria-hidden="true"
           />
 
-          <motion.div
+          <PanelChrome
             ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="review-title"
-            className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl shadow-cosmic ring-1 ring-white/10"
-            style={{ background: 'linear-gradient(180deg, #140A2E 0%, #1C0E3E 55%, #241348 100%)' }}
+            className="w-full max-w-2xl my-auto"
+            blooms={PANEL_BLOOMS.gold}
             {...panelMotion}
           >
-            <div
-              className="pointer-events-none absolute inset-0 z-0"
-              style={{
-                background:
-                  'radial-gradient(closest-side, rgba(255,196,77,0.28), transparent 70%) -12% -8% / 62% 52% no-repeat, radial-gradient(closest-side, rgba(255,111,176,0.26), transparent 70%) 112% -6% / 62% 52% no-repeat, radial-gradient(closest-side, rgba(47,224,216,0.22), transparent 70%) 50% 112% / 80% 45% no-repeat',
-              }}
-              aria-hidden="true"
-            />
-            <GrainOverlay opacity={0.06} />
 
             <div className="relative z-10 px-6 sm:px-8 pt-5 pb-4 sm:pt-7 sm:pb-5 text-center">
               <button
@@ -396,6 +318,19 @@ export default function ReviewDialog() {
               </div>
             ) : (
               <form onSubmit={onSubmit} noValidate className="relative z-10 px-6 sm:px-8 pb-7 pt-1">
+                {/* Honeypot — off-screen, unlabelled, skipped by keyboard and
+                    autofill. Anything typed here is a bot. */}
+                <div className="absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden" aria-hidden="true">
+                  <input
+                    type="text"
+                    name="company"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
                 {/* Star picker */}
                 <fieldset className="mb-5 rounded-2xl bg-white/[0.05] px-5 py-4 text-center ring-1 ring-white/10">
                   <legend className="px-2 text-[13px] font-semibold text-text-light">
@@ -593,7 +528,7 @@ export default function ReviewDialog() {
                 </div>
               </form>
             )}
-          </motion.div>
+          </PanelChrome>
         </div>
       )}
     </AnimatePresence>,

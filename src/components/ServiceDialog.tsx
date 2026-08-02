@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Sparkles, X } from 'lucide-react';
 import { site } from '@/content/site';
+import { PANEL_BLOOMS, PanelChrome } from '@/lib/ui';
 import { SERVICES } from '@/content/services';
-import { GrainOverlay } from '@/components/primitives/AuroraField';
 import { useServiceDialog } from '@/lib/dialogs';
 import { usePrefersReducedMotion, easeOutExpo } from '@/lib/motion';
 
@@ -87,24 +87,15 @@ export default function ServiceDialog() {
             aria-hidden="true"
           />
 
-          <motion.div
+          <PanelChrome
             ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="service-title"
-            className="relative w-full max-w-2xl my-auto overflow-hidden rounded-3xl shadow-cosmic ring-1 ring-white/10"
-            style={{ background: 'linear-gradient(180deg, #140A2E 0%, #1C0E3E 55%, #241348 100%)' }}
+            className="w-full max-w-2xl my-auto"
+            blooms={PANEL_BLOOMS.service}
             {...panelMotion}
           >
-            <div
-              className="pointer-events-none absolute inset-0 z-0"
-              style={{
-                background:
-                  'radial-gradient(closest-side, rgba(47,224,216,0.30), transparent 70%) -15% -10% / 65% 55% no-repeat, radial-gradient(closest-side, rgba(255,111,176,0.26), transparent 70%) 112% -6% / 62% 52% no-repeat, radial-gradient(closest-side, rgba(255,196,77,0.20), transparent 70%) 50% 112% / 80% 45% no-repeat',
-              }}
-              aria-hidden="true"
-            />
-            <GrainOverlay opacity={0.06} />
 
             <div className="relative z-10 px-6 sm:px-9 pt-7 pb-4 text-center">
               <button
@@ -194,7 +185,7 @@ export default function ServiceDialog() {
                 </button>
               </div>
             </div>
-          </motion.div>
+          </PanelChrome>
         </div>
       )}
     </AnimatePresence>,

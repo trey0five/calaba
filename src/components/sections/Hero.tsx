@@ -70,9 +70,27 @@ const statItem: Variants = {
   show: { y: 0, opacity: 1, transition: { duration: 0.7, ease: easeOut } },
 };
 
+/**
+ * Five clicks inside 1.5s on a single word routes to the admin login. Five (not
+ * three) so a visitor double-tapping to select the word never trips it, and the
+ * word stays selectable — see the span below.
+ */
+function useSecretAdminEntrance(clicksNeeded = 5, windowMs = 1500) {
+  const taps = useRef<number[]>([]);
+  return () => {
+    const now = Date.now();
+    taps.current = [...taps.current, now].filter((t) => now - t < windowMs);
+    if (taps.current.length >= clicksNeeded) {
+      taps.current = [];
+      window.location.hash = '#/admin';
+    }
+  };
+}
+
 export default function Hero() {
   const reduced = usePrefersReducedMotion();
   const { openDialog } = useConsultation();
+  const onSecretClick = useSecretAdminEntrance();
   const sectionRef = useRef<HTMLElement>(null);
 
   // Scroll-driven parallax — each layer translates at a different rate
@@ -220,7 +238,14 @@ export default function Hero() {
                 —
               </Reveal>
               <Reveal as="span" direction="up" delay={0.65} className="block">
-                and so is our commitment to them.
+                and so is our commitment to{' '}
+                {/* Hidden staff entrance: five quick clicks on "them" opens the
+                    admin login. No `select-none` — the sentence must stay
+                    selectable and copyable like any other text on the page. */}
+                <span onClick={onSecretClick} className="cursor-text">
+                  them
+                </span>
+                .
               </Reveal>
             </h1>
 

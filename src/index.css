@@ -260,6 +260,40 @@ html {
   animation: twinkle 7s ease-in-out infinite;
 }
 
+/* Admin loading placeholders: a sheen travelling across a glass block.
+   Skeletons instead of spinners so the layout is already in place. */
+@keyframes skeleton-sheen {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.animate-skeleton {
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 20%,
+    rgba(255, 255, 255, 0.11) 40%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sheen 1.6s linear infinite;
+}
+
+/* One teal ring pulsing outward — confirms a card was just published. */
+@keyframes approve-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 224, 216, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 18px rgba(47, 224, 216, 0);
+  }
+}
+.animate-approve-ring {
+  animation: approve-ring 0.7s ease-out 1;
+}
+
 /* Hide horizontal scrollbar while keeping native scroll (mobile carousels) */
 .scrollbar-hide {
   scrollbar-width: none;

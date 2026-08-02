@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Reveal, { RevealDirection } from '@/components/primitives/Reveal';
 import AuroraField from '@/components/primitives/AuroraField';
 import AuroraRibbon from '@/components/primitives/AuroraRibbon';
+import { getStaff } from '@/lib/api';
 
 type Member = {
-  img: string;
+  /** resolved image URL — bundled files are prefixed with BASE_URL, API
+   *  photos arrive as absolute S3 URLs and must NOT be */
+  src: string;
   name: string;
   title: string;
   direction: RevealDirection;
@@ -13,15 +16,22 @@ type Member = {
   h: number;
 };
 
-const TEAM: Member[] = [
-  { img: 'audrey-tatum.webp', w: 900, h: 1152, name: 'Audrey Tatum', title: 'Clinical Supervisor', direction: 'left' },
-  { img: 'geena-roca.webp', w: 900, h: 1075, name: 'Geena Roca', title: 'Lead RBT', direction: 'scale' },
-  { img: 'eric-andrade.webp', w: 900, h: 1140, name: 'Erick Andrade', title: 'Lead RBT', direction: 'right' },
-];
+/** Reveal choreography by position, reused whatever the source of the data. */
+const DIRECTIONS: RevealDirection[] = ['left', 'scale', 'right'];
+
+/** Bundled fallback — stays in the repo forever so the section renders with
+ *  the API down, and is only replaced by a non-empty live roster. */
+const TEAM: Member[] = (
+  [
+    { src: 'audrey-tatum.webp', w: 900, h: 1152, name: 'Audrey Tatum', title: 'Clinical Supervisor', direction: 'left' },
+    { src: 'geena-roca.webp', w: 900, h: 1075, name: 'Geena Roca', title: 'Lead RBT', direction: 'scale' },
+    { src: 'eric-andrade.webp', w: 900, h: 1140, name: 'Erick Andrade', title: 'Lead RBT', direction: 'right' },
+  ] as Member[]
+).map((m) => ({ ...m, src: `${import.meta.env.BASE_URL}${m.src}` }));
 
 function MemberCard({ member, index }: { member: Member; index: number }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const src = `${import.meta.env.BASE_URL}${member.img}`;
+  const src = member.src;
 
   return (
     <Reveal
@@ -67,6 +77,36 @@ function MemberCard({ member, index }: { member: Member; index: number }) {
 }
 
 export default function Team() {
+  const [team, setTeam] = useState<Member[]>(TEAM);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    let live = true;
+    getStaff(ac.signal).then((staff) => {
+      if (!live || !staff) return;
+      // Build the replacement FIRST, then decide. Checking `staff.team.length`
+      // before filtering out photoless members meant a roster where every
+      // member was still awaiting a photo upload blanked the whole section.
+      const next: Member[] = (staff.team || [])
+        .filter((m) => m?.photo?.url && m.name)
+        .map((m, i) => ({
+          src: m.photo!.url,
+          name: m.name,
+          title: m.title,
+          // keep the API's intrinsic size so the CLS reservation survives
+          w: m.photo?.w ?? 900,
+          h: m.photo?.h ?? 1125,
+          direction: DIRECTIONS[i % DIRECTIONS.length],
+        }));
+      if (next.length === 0) return;   // keep the bundled team
+      setTeam(next);
+    });
+    return () => {
+      live = false;
+      ac.abort();
+    };
+  }, []);
+
   return (
     <section
       id="team"
@@ -100,7 +140,7 @@ export default function Team() {
           data-auto-carousel
           className="mt-14 flex items-stretch overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 -mx-6 px-6 pt-2 pb-4 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:items-stretch"
         >
-          {TEAM.map((member, i) => (
+          {team.map((member, i) => (
             <MemberCard key={member.name} member={member} index={i} />
           ))}
         </div>

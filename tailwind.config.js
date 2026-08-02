@@ -47,6 +47,7 @@ export default {
         card: '0 10px 30px rgba(30,11,59,0.10)',
         cosmic: '0 14px 40px rgba(11,4,24,0.45)',
         'glow-gold': '0 0 24px rgba(245,176,39,0.5)',
+        'glow-teal': '0 0 24px rgba(47,224,216,0.45)',
         'glow-magenta': '0 30px 80px -20px rgba(214,51,122,0.45)',
       },
     },

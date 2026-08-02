@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Quote, Star } from 'lucide-react';
 import { site } from '@/content/site';
+import { getTestimonials, Testimonial } from '@/lib/api';
+import { AVATAR_GRADIENTS } from '@/lib/ui';
 import AuroraField, { SectionSeams } from '@/components/primitives/AuroraField';
 import AuroraRibbon from '@/components/primitives/AuroraRibbon';
 import ParticleField from '@/components/primitives/ParticleField';
@@ -12,20 +14,30 @@ import Reveal from '@/components/primitives/Reveal';
 
 const ROTATE_MS = 9000;
 
-/** Brand gradient per avatar so consecutive reviews feel distinct. */
-const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #2FE0D8 0%, #0E5A56 100%)',
-  'linear-gradient(135deg, #FF6FB0 0%, #9C1F5B 100%)',
-  'linear-gradient(135deg, #FFC44D 0%, #B07C0F 100%)',
-  'linear-gradient(135deg, #FF8A6E 0%, #B8451F 100%)',
-];
-
 export default function Testimonials() {
   const reduced = usePrefersReducedMotion();
   const { openDialog: openReview } = useReview();
-  const quotes = site.testimonials;
+  /* The bundled samples ARE the fallback: they render immediately and stay
+     forever if the API is slow, down, or has nothing approved yet. */
+  const [quotes, setQuotes] = useState<Testimonial[]>(site.testimonials);
   const [[index, direction], setSlide] = useState<[number, number]>([0, 1]);
   const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    let live = true;
+    getTestimonials(ac.signal).then((items) => {
+      if (!live || !items || items.length === 0) return;
+      setQuotes(items);
+      // The live set is a different length — restart the carousel rather than
+      // landing on an index that no longer exists.
+      setSlide([0, 1]);
+    });
+    return () => {
+      live = false;
+      ac.abort();
+    };
+  }, []);
 
   const go = useCallback(
     (next: number, dir: number) => {
@@ -140,7 +152,13 @@ export default function Testimonials() {
                     }}
                     className="w-full cursor-grab active:cursor-grabbing"
                   >
-                    <div className="flex gap-1 mb-4" aria-label={`${current.rating} out of 5 stars`}>
+                    {/* role="img" — a bare <div> has no role for the accessible
+                        name to attach to, so the rating announced as nothing. */}
+                    <div
+                      className="flex gap-1 mb-4"
+                      role="img"
+                      aria-label={`${current.rating} out of 5 stars`}
+                    >
                       {Array.from({ length: current.rating }, (_, i) => (
                         <Star key={i} size={16} className="fill-gold text-gold" aria-hidden="true" />
                       ))}

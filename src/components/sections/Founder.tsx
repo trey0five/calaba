@@ -1,15 +1,51 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Reveal from '@/components/primitives/Reveal';
 import AuroraField, { SectionSeams } from '@/components/primitives/AuroraField';
 import ParticleField from '@/components/primitives/ParticleField';
+import { getStaff } from '@/lib/api';
 import { useConsultation } from '@/lib/dialogs';
 
-const FOUNDER_IMG = `${import.meta.env.BASE_URL}cristina-andrade.webp`;
-const chips = ['Ed.S.', 'BCBA'];
+/** Bundled fallback — never removed, so the section renders with the API down. */
+const FALLBACK = {
+  src: `${import.meta.env.BASE_URL}cristina-andrade.webp`,
+  w: 900,
+  h: 600,
+  name: 'Cristina Andrade',
+  title: 'Founder & Clinical Director',
+  credentials: ['Ed.S.', 'BCBA'],
+};
 
 export default function Founder() {
   const [imgFailed, setImgFailed] = useState(false);
+  const [founder, setFounder] = useState(FALLBACK);
   const { openDialog } = useConsultation();
+
+  useEffect(() => {
+    const ac = new AbortController();
+    let live = true;
+    getStaff(ac.signal).then((staff) => {
+      const f = staff?.founder;
+      if (!live || !f || !f.photo?.url) return;
+      setImgFailed(false);
+      setFounder({
+        // API photos are absolute S3 URLs — BASE_URL must NOT be prefixed
+        src: f.photo.url,
+        w: f.photo.w ?? FALLBACK.w,
+        h: f.photo.h ?? FALLBACK.h,
+        name: f.name || FALLBACK.name,
+        title: f.title || FALLBACK.title,
+        credentials: f.credentials?.length ? f.credentials : FALLBACK.credentials,
+      });
+    });
+    return () => {
+      live = false;
+      ac.abort();
+    };
+  }, []);
+
+  const chips = founder.credentials;
+  const credentialSuffix = chips.length ? `, ${chips.join(', ')}` : '';
+  const [firstName, ...restName] = founder.name.split(' ');
 
   return (
     <section
@@ -41,11 +77,10 @@ export default function Founder() {
                 className="h-16 w-auto opacity-90"
               />
               <p className="mt-5 text-text-light font-semibold text-lg">
-                Cristina Andrade, Ed.S., BCBA
+                {founder.name}
+                {credentialSuffix}
               </p>
-              <p className="mt-1 text-gold-bright text-sm font-medium">
-                Founder &amp; Clinical Director
-              </p>
+              <p className="mt-1 text-gold-bright text-sm font-medium">{founder.title}</p>
             </div>
           ) : (
             <div
@@ -56,10 +91,10 @@ export default function Founder() {
               }}
             >
               <img
-                src={FOUNDER_IMG}
-                alt="Cristina Andrade, Founder & Clinical Director of CAL-ABA"
-                width={900}
-                height={600}
+                src={founder.src}
+                alt={`${founder.name}, ${founder.title} of CAL-ABA`}
+                width={founder.w}
+                height={founder.h}
                 loading="lazy"
                 decoding="async"
                 onError={() => setImgFailed(true)}
@@ -77,11 +112,11 @@ export default function Founder() {
             className="mt-4 text-text-light font-bold tracking-tight leading-[1.1]"
             style={{ fontSize: 'clamp(28px, 4vw, 44px)' }}
           >
-            Cristina <span className="brand-gradient-text-bright">Andrade</span>, Ed.S., BCBA
+            {firstName}{' '}
+            <span className="brand-gradient-text-bright">{restName.join(' ')}</span>
+            {credentialSuffix}
           </h2>
-          <p className="mt-2 text-gold-bright font-semibold">
-            Founder &amp; Clinical Director
-          </p>
+          <p className="mt-2 text-gold-bright font-semibold">{founder.title}</p>
 
           <div className="mt-5 flex flex-wrap gap-2">
             {chips.map((chip, i) => (
