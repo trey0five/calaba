@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Star, Trash2, Undo2 } from 'lucide-react';
+import { Info, Pencil, Quote, Star, Trash2, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { easeOutExpo, usePrefersReducedMotion } from '@/lib/motion';
-import { Select } from '@/lib/ui';
+import { fieldBase, Label, PANEL_BLOOMS, Select } from '@/lib/ui';
+import Drawer from '../components/Drawer';
 import * as api from '../adminApi';
 import { useAuth } from '../auth';
 import { useAdminData } from '../data';
 import { useAdminRoute } from '../router';
-import type { AdminReview, ReviewStatus } from '../types';
+import type { AdminReview, ReviewDisplay, ReviewStatus } from '../types';
 import {
   avatarGradient,
   btnDanger,
@@ -67,6 +68,84 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={cn(btnGhost, 'w-full sm:w-auto')}>
+      <Pencil size={16} />
+      Edit
+    </button>
+  );
+}
+
+/** The published copy, held as strings while it is being edited. */
+interface DisplayDraft {
+  id: string;
+  quote: string;
+  attribution: string;
+  location: string;
+  service: string;
+  initials: string;
+  rating: number;
+}
+
+const MAX_INITIALS = 3;
+
+/**
+ * A compact restatement of the public carousel card (see
+ * components/sections/Testimonials.tsx) so the owner is editing something that
+ * looks like what visitors will read, not a form.
+ */
+function HomepagePreview({ draft, seed }: { draft: DisplayDraft; seed: string }) {
+  const gradient = avatarGradient(seed);
+  return (
+    <div className="relative rounded-[18px] bg-bg-deep p-px">
+      <div
+        className="pointer-events-none absolute inset-0 rounded-[18px] opacity-70"
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(47,224,216,0.55), rgba(255,111,176,0.45) 45%, rgba(255,196,77,0.5))',
+        }}
+        aria-hidden="true"
+      />
+      <div className="relative rounded-[17px] bg-[#140A2E] px-5 py-5">
+        <Quote size={30} className="absolute right-4 top-3 text-gold/20" aria-hidden="true" />
+        <span className="flex gap-0.5" role="img" aria-label={`${draft.rating} out of 5 stars`}>
+          {Array.from({ length: Math.max(1, Math.min(5, draft.rating)) }, (_, i) => (
+            <Star key={i} size={13} className="fill-gold text-gold" aria-hidden="true" />
+          ))}
+        </span>
+        <p className="mt-3 text-[14px] leading-relaxed text-text-light">
+          {draft.quote.trim() || (
+            <span className="text-text-light/40">The quote shows here.</span>
+          )}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <span
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[12px] font-bold text-white ring-1 ring-white/20"
+            style={{ background: gradient }}
+            aria-hidden="true"
+          >
+            {draft.initials.trim() || '?'}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[13px] font-semibold text-text-light">
+              {draft.attribution.trim() || (
+                <span className="text-text-light/40">No name shown</span>
+              )}
+            </span>
+            <span className="block text-xs text-text-light/70">{draft.location}</span>
+          </span>
+          {draft.service.trim() && (
+            <span className="ml-auto rounded-full bg-teal-bright/15 px-3 py-1 text-[11px] font-semibold text-teal-bright ring-1 ring-teal-bright/30">
+              {draft.service}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Reviews() {
   const route = useAdminRoute();
   const { authed } = useAuth();
@@ -93,6 +172,9 @@ export default function Reviews() {
   const [ringing, setRinging] = useState<string | null>(null);
   /** Cards held in their old tab for 600ms so the pill morph is visible. */
   const [pinned, setPinned] = useState<Record<string, ReviewStatus>>({});
+  /** Published-copy editor. `null` = drawer closed. */
+  const [draft, setDraft] = useState<DisplayDraft | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   useEffect(() => {
     const q = route.query.status as ReviewStatus | undefined;
@@ -188,6 +270,107 @@ export default function Reviews() {
     }
   };
 
+  const openEdit = (review: AdminReview) => {
+    const d = review.display || ({} as ReviewDisplay);
+    setDraft({
+      id: review.id,
+      quote: d.quote || review.submission.review || '',
+      attribution: d.attribution || '',
+      location: d.location || '',
+      service: d.service || '',
+      initials: d.initials || '',
+      rating: Math.max(1, Math.min(5, Number(d.rating) || review.submission.rating || 5)),
+    });
+  };
+
+  /**
+   * Publish-copy save. Sends ONLY `{display}` — the submission the family wrote
+   * is evidence and is never rewritten, and omitting `status` keeps the server
+   * from re-stamping `moderation` (which would erase the imported-sample note).
+   */
+  const saveDraft = async () => {
+    if (!draft || savingDraft) return;
+    const patch: ReviewDisplay = {
+      quote: draft.quote.trim(),
+      attribution: draft.attribution.trim(),
+      location: draft.location.trim(),
+      service: draft.service.trim(),
+      initials: draft.initials.trim().slice(0, MAX_INITIALS),
+      rating: Math.max(1, Math.min(5, Math.round(draft.rating) || 5)),
+    };
+    if (!patch.quote) {
+      push({ tone: 'error', title: 'A quote is required', body: 'The card has nothing to show without it.' });
+      return;
+    }
+    if (!patch.attribution || !patch.initials) {
+      push({
+        tone: 'error',
+        title: 'Attribution and initials are required',
+        body: 'The homepage skips any review missing either — it would render as a nameless empty circle.',
+      });
+      return;
+    }
+
+    const snapshot = reviews;
+    const wasLive = reviews.find((r) => r.id === draft.id)?.status === 'approved';
+    setSavingDraft(true);
+    setReviews((prev) =>
+      prev.map((r) =>
+        r.id === draft.id ? { ...r, display: { ...r.display, ...patch } } : r,
+      ),
+    );
+    try {
+      const record = await authed((t) => api.updateReview(t, draft.id, { display: patch }));
+      // Adopt the server's copy — it clamps and trims on its own terms.
+      setReviews((prev) => prev.map((r) => (r.id === record.id ? record : r)));
+      logActivity('Edited the published text of a review', 'teal');
+      push({
+        tone: 'success',
+        title: 'Published copy updated',
+        body: wasLive ? 'The homepage carousel shows the new wording.' : undefined,
+        href: wasLive ? { label: 'View on the site', url: '/#voices' } : undefined,
+      });
+      setDraft(null);
+    } catch (err) {
+      setReviews(() => snapshot);
+      push({
+        tone: 'error',
+        title: 'That didn’t save',
+        body:
+          err instanceof api.ApiError
+            ? `${err.message} Your edit was rolled back.`
+            : 'Your edit was rolled back. Check your connection and try again.',
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const confirmDelete = (review: AdminReview, live: boolean) =>
+    confirm({
+      title: live ? 'Delete this review from the site?' : 'Delete this review forever?',
+      body: (
+        <>
+          The review from{' '}
+          <strong className="text-text-light">
+            {review.submission.name || review.display?.attribution || 'a family'}
+          </strong>{' '}
+          {live ? (
+            <>
+              is <strong className="text-text-light">live on the homepage right now</strong> — it
+              disappears from the site as soon as you delete it, and it is removed permanently.
+            </>
+          ) : (
+            <>will be permanently removed.</>
+          )}{' '}
+          This cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete forever',
+      requireTyped: 'DELETE',
+      onConfirm: () => removeForever(review),
+    });
+
   const removeForever = async (review: AdminReview) => {
     const snapshot = reviews;
     setReviews((prev) => prev.filter((r) => r.id !== review.id));
@@ -267,6 +450,9 @@ export default function Reviews() {
               const anonymous = s.credit === 'Post anonymously';
               const isOpen = !!expanded[review.id];
               const busy = busyIds.has(review.id);
+              /* Invented copy must never be mistaken for a family's words. */
+              const imported = review.moderation?.decidedBy === 'import';
+              const note = (review.moderation?.note || '').trim();
 
               return (
                 <motion.article
@@ -285,10 +471,22 @@ export default function Reviews() {
                     <div className="flex flex-wrap items-center gap-3">
                       <Stars rating={s.rating || review.display.rating || 0} />
                       <StatusPill kind="review" status={review.status} />
+                      {imported && (
+                        <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-[11px] font-semibold text-gold-bright ring-1 ring-gold/30">
+                          Sample copy
+                        </span>
+                      )}
                       <span className="ml-auto text-xs text-text-light/65" title={fullDate(review.createdAt)}>
                         {relativeTime(review.createdAt)}
                       </span>
                     </div>
+
+                    {note && (
+                      <p className="mt-3 flex items-start gap-2 rounded-xl bg-gold/10 px-3 py-2 text-xs leading-relaxed text-gold-bright ring-1 ring-gold/20">
+                        <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>{note}</span>
+                      </p>
+                    )}
 
                     {s.headline && (
                       <h3 className="mt-3 text-lg font-semibold text-text-light">{s.headline}</h3>
@@ -302,6 +500,21 @@ export default function Reviews() {
                     >
                       {s.review || review.display.quote}
                     </p>
+                    {/* The paragraph above is what the FAMILY wrote. Once the
+                        owner edits the published copy the two diverge, and
+                        without this the card looks like the save did nothing. */}
+                    {(review.display?.quote || '').trim() !== (s.review || '').trim() &&
+                      (review.display?.quote || '').trim() !== '' && (
+                        <div className="mt-3 rounded-xl border border-teal-bright/25 bg-teal-bright/[0.07] px-3 py-2.5">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-teal-bright">
+                            Published on the site
+                          </span>
+                          <p className="mt-1 text-[14px] leading-relaxed text-text-light/90">
+                            {review.display.quote}
+                          </p>
+                        </div>
+                      )}
+
                     {(s.review || '').length > 180 && (
                       <button
                         type="button"
@@ -425,8 +638,10 @@ export default function Reviews() {
                           >
                             Reject
                           </button>
+                          <EditButton onClick={() => openEdit(review)} />
                         </>
                       )}
+
 
                       {review.status === 'approved' && (
                         <>
@@ -454,6 +669,20 @@ export default function Reviews() {
                           >
                             {busy ? <Working label="Working…" /> : 'Unpublish'}
                           </button>
+                          <EditButton onClick={() => openEdit(review)} />
+                          {/* Deleting a LIVE review is offered here too — an
+                              imported sample the owner never wants shown should
+                              not need an unpublish-then-archive detour first.
+                              The confirm copy says it vanishes from the site. */}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => confirmDelete(review, true)}
+                            className={cn(btnDanger, 'w-full sm:w-auto')}
+                          >
+                            <Trash2 size={16} />
+                            Delete
+                          </button>
                           <span className="inline-flex items-center gap-2 text-xs text-text-light/60 sm:ml-2">
                             <span className="relative flex h-2 w-2" aria-hidden="true">
                               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-bright opacity-75" />
@@ -480,26 +709,11 @@ export default function Reviews() {
                             <Undo2 size={16} />
                             Restore to pending
                           </button>
+                          <EditButton onClick={() => openEdit(review)} />
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() =>
-                              confirm({
-                                title: 'Delete this review forever?',
-                                body: (
-                                  <>
-                                    The review from{' '}
-                                    <strong className="text-text-light">
-                                      {s.name || 'a family'}
-                                    </strong>{' '}
-                                    will be permanently removed. This cannot be undone.
-                                  </>
-                                ),
-                                confirmLabel: 'Delete forever',
-                                requireTyped: 'DELETE',
-                                onConfirm: () => removeForever(review),
-                              })
-                            }
+                            onClick={() => confirmDelete(review, false)}
                             className={cn(btnDanger, 'w-full sm:w-auto')}
                           >
                             <Trash2 size={16} />
@@ -522,6 +736,131 @@ export default function Reviews() {
           </AnimatePresence>
         )}
       </div>
+
+      <Drawer
+        open={!!draft}
+        onClose={() => setDraft(null)}
+        title="Edit published text"
+        width={460}
+        blooms={PANEL_BLOOMS.gold}
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <button type="button" onClick={() => setDraft(null)} className={btnGhost}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={saveDraft}
+              disabled={savingDraft}
+              className={cn(btnGold, 'min-w-[9rem]')}
+            >
+              {savingDraft ? <Working label="Saving…" /> : 'Save changes'}
+            </button>
+          </div>
+        }
+      >
+        {draft && (
+          <div className="space-y-5">
+            <p className="text-xs leading-relaxed text-text-light/65">
+              This is the copy that appears on the homepage. The family&rsquo;s original
+              submission is kept untouched underneath.
+            </p>
+
+            <div>
+              <span className="mb-1.5 block text-[13px] font-semibold text-text-light">
+                On the homepage
+              </span>
+              <HomepagePreview draft={draft} seed={draft.id} />
+            </div>
+
+            <div>
+              <Label htmlFor="rv-quote" required>
+                Quote
+              </Label>
+              <textarea
+                id="rv-quote"
+                rows={6}
+                value={draft.quote}
+                onChange={(e) => setDraft((d) => (d ? { ...d, quote: e.target.value } : d))}
+                className={cn(fieldBase, 'resize-y')}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="rv-attribution" required>
+                Attribution
+              </Label>
+              <input
+                id="rv-attribution"
+                value={draft.attribution}
+                onChange={(e) => setDraft((d) => (d ? { ...d, attribution: e.target.value } : d))}
+                placeholder="Parent of a 4-year-old"
+                className={fieldBase}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="rv-location">Location</Label>
+                <input
+                  id="rv-location"
+                  value={draft.location}
+                  onChange={(e) => setDraft((d) => (d ? { ...d, location: e.target.value } : d))}
+                  placeholder="Broward County"
+                  className={fieldBase}
+                />
+              </div>
+              <div>
+                <Label htmlFor="rv-service">Service</Label>
+                <input
+                  id="rv-service"
+                  value={draft.service}
+                  onChange={(e) => setDraft((d) => (d ? { ...d, service: e.target.value } : d))}
+                  placeholder="Home-Based ABA"
+                  className={fieldBase}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="rv-initials" required>
+                  Initials
+                </Label>
+                <input
+                  id="rv-initials"
+                  value={draft.initials}
+                  maxLength={MAX_INITIALS}
+                  onChange={(e) =>
+                    setDraft((d) =>
+                      d ? { ...d, initials: e.target.value.slice(0, MAX_INITIALS) } : d,
+                    )
+                  }
+                  placeholder="BC"
+                  className={fieldBase}
+                />
+                <p className="mt-1.5 text-xs text-text-light/55">
+                  Up to {MAX_INITIALS} characters — shown in the avatar circle.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="rv-rating">Rating</Label>
+                <Select
+                  id="rv-rating"
+                  value={String(draft.rating)}
+                  onChange={(v) => setDraft((d) => (d ? { ...d, rating: Number(v) } : d))}
+                >
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n} star{n === 1 ? '' : 's'}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
+      </Drawer>
 
       {dialog}
     </PageEnter>

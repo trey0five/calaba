@@ -1,9 +1,12 @@
-import { Instagram, Facebook, Linkedin } from 'lucide-react';
+import { Instagram, Facebook, Linkedin, Star } from 'lucide-react';
 import { site } from '@/content/site';
+import { useReview } from '@/lib/dialogs';
 import AuroraField from '@/components/primitives/AuroraField';
 import ParticleField from '@/components/primitives/ParticleField';
 
 export default function Footer() {
+  const { openDialog: openReview } = useReview();
+
   return (
     <footer className="relative bg-ink-950 text-text-light overflow-hidden">
       <AuroraField variant="footer" />
@@ -77,6 +80,16 @@ export default function Footer() {
                 </a>
               </li>
               <li>{site.contact.hours}</li>
+              <li className="pt-2">
+                <button
+                  type="button"
+                  onClick={openReview}
+                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-text-light ring-1 ring-white/25 backdrop-blur transition hover:bg-white/20"
+                >
+                  <Star size={14} className="fill-gold text-gold" aria-hidden="true" />
+                  Leave a review
+                </button>
+              </li>
             </ul>
           </div>
         </div>

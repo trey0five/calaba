@@ -200,20 +200,27 @@ function once<T>(key: string, run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Approved + consented testimonials, or `null` to keep the bundled samples.
- * Only a non-empty, well-shaped array ever replaces the fallback.
+ * Approved + consented testimonials.
+ *
+ * The two failure modes are NOT the same answer and must not collapse together:
+ *
+ *   `null` — we never heard back (network error, timeout, non-2xx, or a body
+ *            that isn't a usable list). The caller keeps its bundled samples.
+ *   `[]`   — the server answered, and there are genuinely no published reviews.
+ *            The caller must show nothing. Falling back to the bundle here is
+ *            what made deleted reviews reappear on the homepage.
  */
 export async function getTestimonials(
   signal?: AbortSignal,
   onFresh?: (data: Testimonial[]) => void,
 ): Promise<Testimonial[] | null> {
   const cached = cacheRead<Testimonial[]>('calaba:testimonials');
-  if (cached && cached.length > 0) {
+  // An empty cache entry is a real answer, so `Array.isArray`, not truthiness.
+  if (Array.isArray(cached)) {
     // Revalidate behind the paint; only disturb the UI on a real change.
     if (onFresh) {
       void fetchTestimonialsFresh().then((fresh) => {
-        if (fresh && fresh.length > 0 && !signal?.aborted &&
-            JSON.stringify(fresh) !== JSON.stringify(cached)) {
+        if (fresh && !signal?.aborted && JSON.stringify(fresh) !== JSON.stringify(cached)) {
           onFresh(fresh);
         }
       });
@@ -229,12 +236,14 @@ function fetchTestimonialsFresh(): Promise<Testimonial[] | null> {
   return once('testimonials', async () => {
     try {
       const data = await fetchJson<unknown>('/api/public/testimonials');
-      if (!Array.isArray(data) || data.length === 0) return null;
+      if (!Array.isArray(data)) return null;
       const items = data.filter(isTestimonial).map((t) => ({
         ...t,
         rating: clampRating(t.rating),
       }));
-      if (items.length === 0) return null;
+      // The server sent rows but not one of them was renderable — that is a
+      // broken payload, not "no reviews", so keep the bundle.
+      if (data.length > 0 && items.length === 0) return null;
       cacheWrite('calaba:testimonials', items);
       return items;
     } catch {
@@ -243,7 +252,15 @@ function fetchTestimonialsFresh(): Promise<Testimonial[] | null> {
   });
 }
 
-/** Live staff, or `null` to keep the bundled team/founder. */
+/**
+ * Live staff, or `null` to keep the bundled team/founder.
+ *
+ * Deliberately NOT split into null-vs-empty the way `getTestimonials` is: the
+ * founder block and the team grid are structural parts of the About page with
+ * bundled copy and a bundled portrait, and "no staff records" is not a state
+ * the owner can reach on purpose the way "no reviews" is. Changing it would
+ * mean reworking Founder/Team/StaffCard, which are out of scope here.
+ */
 export async function getStaff(
   signal?: AbortSignal,
   onFresh?: (data: PublicStaff) => void,

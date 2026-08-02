@@ -17,8 +17,11 @@ const ROTATE_MS = 9000;
 export default function Testimonials() {
   const reduced = usePrefersReducedMotion();
   const { openDialog: openReview } = useReview();
-  /* The bundled samples ARE the fallback: they render immediately and stay
-     forever if the API is slow, down, or has nothing approved yet. */
+  /* The bundled samples ARE the API-down fallback: they render immediately and
+     stay if the API is slow, down, or answers with something unusable.
+     They are NOT a floor — an empty list from a reachable server empties this
+     array and the whole section unmounts (see the guard below). Otherwise an
+     owner who deletes every review watches the sample copy come back. */
   const [quotes, setQuotes] = useState<Testimonial[]>(site.testimonials);
   const [[index, direction], setSlide] = useState<[number, number]>([0, 1]);
   const [paused, setPaused] = useState(false);
@@ -27,7 +30,9 @@ export default function Testimonials() {
     const ac = new AbortController();
     let live = true;
     const apply = (items: Awaited<ReturnType<typeof getTestimonials>>) => {
-      if (!live || !items || items.length === 0) return;
+      // `null` (and only null) means "we never heard back" — keep the bundle.
+      // `[]` is an answer: there are no published reviews, so show none.
+      if (!live || items === null) return;
       setQuotes(items);
       // The live set is a different length — restart the carousel rather than
       // landing on an index that no longer exists.
@@ -42,6 +47,7 @@ export default function Testimonials() {
 
   const go = useCallback(
     (next: number, dir: number) => {
+      if (quotes.length === 0) return;
       setSlide([((next % quotes.length) + quotes.length) % quotes.length, dir]);
     },
     [quotes.length],
@@ -50,12 +56,19 @@ export default function Testimonials() {
   /* Autoplay — pauses on hover/focus and while a pointer is down. */
   const timerRef = useRef<number | null>(null);
   useEffect(() => {
-    if (reduced || paused) return;
+    if (reduced || paused || quotes.length === 0) return;
     timerRef.current = window.setTimeout(() => go(index + 1, 1), ROTATE_MS);
     return () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
-  }, [index, paused, reduced, go]);
+  }, [index, paused, reduced, go, quotes.length]);
+
+  /* No published reviews -> no band at all. Rendering the heading, the star
+     row and an empty card would advertise that nobody has said anything.
+     Every hook above runs first so the hook order never changes. Blog (light)
+     then sits directly above Careers (light) and both carry their own seams,
+     so the page rhythm survives losing the dark field between them. */
+  if (quotes.length === 0) return null;
 
   const current = quotes[index];
   const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
