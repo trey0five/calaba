@@ -1,5 +1,11 @@
 import { useRef } from 'react';
 import { motion, useScroll, useTransform, type Variants } from 'framer-motion';
+import {
+  ClipboardCheck,
+  HeartHandshake,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react';
 import Reveal from '@/components/primitives/Reveal';
 import AuroraField, {
   AURORA_CORAL,
@@ -14,10 +20,34 @@ import ParticleField from '@/components/primitives/ParticleField';
 import { useConsultation } from '@/lib/dialogs';
 import { usePrefersReducedMotion } from '@/lib/motion';
 
-const stats = [
-  { word: 'BCBA-led', label: 'Every treatment plan' },
-  { word: 'Assent-based', label: 'Care your child agrees to' },
-  { word: 'In-network', label: 'Aetna · Florida Blue · Step Up' },
+const stats: {
+  icon: LucideIcon;
+  word: string;
+  label: string;
+  gradient: string;
+  glow: string;
+}[] = [
+  {
+    icon: ClipboardCheck,
+    word: 'BCBA-led',
+    label: 'Every treatment plan',
+    gradient: 'linear-gradient(135deg, #2FE0D8 0%, #0E5A56 100%)',
+    glow: 'rgba(47,224,216,0.35)',
+  },
+  {
+    icon: HeartHandshake,
+    word: 'Assent-based',
+    label: 'Care your child agrees to',
+    gradient: 'linear-gradient(135deg, #FF6FB0 0%, #9C1F5B 100%)',
+    glow: 'rgba(255,111,176,0.32)',
+  },
+  {
+    icon: ShieldCheck,
+    word: 'In-network',
+    label: 'Aetna · Florida Blue · Cigna · Step Up',
+    gradient: 'linear-gradient(135deg, #FFC44D 0%, #B8451F 100%)',
+    glow: 'rgba(255,196,77,0.35)',
+  },
 ];
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
@@ -234,24 +264,39 @@ export default function Hero() {
         animate={reduced ? false : 'show'}
       >
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {stats.map((s, i) => (
+          {stats.map((s) => (
             <motion.div
               key={s.word}
               variants={statItem}
-              className="bg-white/[0.09] ring-1 ring-white/20 shadow-cosmic rounded-2xl px-5 py-4 backdrop-blur-[2px] hover:ring-gold/40 hover:-translate-y-1 transition-transform will-change-transform"
+              style={{ ['--glow' as string]: s.glow, ['--grad' as string]: s.gradient }}
+              className="group relative rounded-2xl p-px shadow-cosmic transition-shadow duration-500 hover:shadow-[0_24px_54px_-20px_var(--glow)]"
             >
-              <div
-                className="animate-float"
-                style={{ animationDelay: `${i * 0.6}s` }}
-              >
-                <div className="type-lift-soft text-white font-bold text-lg leading-tight">
-                  <span
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-gold mr-2 align-middle animate-pulse"
-                    aria-hidden="true"
-                  />
-                  {s.word}
-                </div>
-                <div className="text-text-light/90 text-sm mt-1">{s.label}</div>
+              {/* accent hairline frame, resolves on hover */}
+              <span
+                className="pointer-events-none absolute inset-0 rounded-2xl bg-white/15 transition-opacity duration-500"
+                aria-hidden="true"
+              />
+              <span
+                className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                style={{ background: 'var(--grad)' }}
+                aria-hidden="true"
+              />
+
+              <div className="relative flex items-center gap-3.5 rounded-[15px] bg-ink-950/70 px-4 py-4 backdrop-blur-md">
+                <span
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-[0_10px_22px_-8px_var(--glow)] transition-transform duration-500 group-hover:scale-105"
+                  style={{ background: 'var(--grad)' }}
+                >
+                  <s.icon size={21} />
+                </span>
+                <span className="min-w-0">
+                  <span className="type-lift-soft block text-white font-bold text-[17px] leading-tight">
+                    {s.word}
+                  </span>
+                  <span className="mt-0.5 block text-text-light/80 text-[13px] leading-snug">
+                    {s.label}
+                  </span>
+                </span>
               </div>
             </motion.div>
           ))}

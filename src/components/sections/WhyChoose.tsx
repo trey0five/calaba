@@ -34,7 +34,7 @@ const items: {
   {
     icon: CreditCard,
     label: 'Insurance accepted',
-    tag: 'Aetna, Florida Blue, Step Up For Students',
+    tag: 'Aetna, Florida Blue, Cigna, Step Up For Students',
     ring: 'bg-magenta/[0.12]',
     glyph: 'text-magenta-deep',
   },

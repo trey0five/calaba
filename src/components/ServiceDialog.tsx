@@ -183,7 +183,7 @@ export default function ServiceDialog() {
 
               <div className="mt-8 flex flex-col items-center gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-between">
                 <p className="text-sm text-text-light/70">
-                  Covered by Aetna, Florida Blue and Step Up For Students.
+                  Covered by Aetna, Florida Blue, Cigna and Step Up For Students.
                 </p>
                 <button
                   type="button"

@@ -82,7 +82,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/10 mt-12 pt-6 text-center text-sm uppercase tracking-[0.14em] text-gold">
-          Insurance Accepted: Aetna · Florida Blue · Step Up For Students
+          Insurance Accepted: Aetna · Florida Blue · Cigna · Step Up For Students
         </div>
 
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-light-muted">
