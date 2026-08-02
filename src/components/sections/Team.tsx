@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import Reveal, { RevealDirection } from '@/components/primitives/Reveal';
 import AuroraField from '@/components/primitives/AuroraField';
 import AuroraRibbon from '@/components/primitives/AuroraRibbon';
+import StaffCard from '@/components/primitives/StaffCard';
 import { getStaff } from '@/lib/api';
 
 type Member = {
-  /** resolved image URL — bundled files are prefixed with BASE_URL, API
-   *  photos arrive as absolute S3 URLs and must NOT be */
+  /** resolved HEADSHOT url — bundled files are prefixed with BASE_URL, API
+   *  photos arrive as absolute S3 URLs and must NOT be. The card frame, name
+   *  and title are composed around it by <StaffCard>. */
   src: string;
   name: string;
   title: string;
@@ -20,19 +22,18 @@ type Member = {
 const DIRECTIONS: RevealDirection[] = ['left', 'scale', 'right'];
 
 /** Bundled fallback — stays in the repo forever so the section renders with
- *  the API down, and is only replaced by a non-empty live roster. */
+ *  the API down, and is only replaced by a non-empty live roster. These are the
+ *  plain HEADSHOTS cropped out of the three original card designs, so the
+ *  composed card is identical to the artwork it replaces. */
 const TEAM: Member[] = (
   [
-    { src: 'audrey-tatum.webp', w: 900, h: 1152, name: 'Audrey Tatum', title: 'Clinical Supervisor', direction: 'left' },
-    { src: 'geena-roca.webp', w: 900, h: 1075, name: 'Geena Roca', title: 'Lead RBT', direction: 'scale' },
-    { src: 'eric-andrade.webp', w: 900, h: 1140, name: 'Erick Andrade', title: 'Lead RBT', direction: 'right' },
+    { src: 'head-audrey.webp', w: 600, h: 600, name: 'Audrey Tatum', title: 'Clinical Supervisor', direction: 'left' },
+    { src: 'head-geena.webp', w: 600, h: 600, name: 'Geena Roca', title: 'Lead RBT', direction: 'scale' },
+    { src: 'head-erick.webp', w: 600, h: 600, name: 'Erick Andrade', title: 'Lead RBT', direction: 'right' },
   ] as Member[]
 ).map((m) => ({ ...m, src: `${import.meta.env.BASE_URL}${m.src}` }));
 
 function MemberCard({ member, index }: { member: Member; index: number }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const src = member.src;
-
   return (
     <Reveal
       direction={member.direction}
@@ -40,30 +41,15 @@ function MemberCard({ member, index }: { member: Member; index: number }) {
       scale={member.direction === 'scale' ? 0.9 : undefined}
       className="snap-center shrink-0 w-[80vw] md:w-auto md:shrink group flex flex-col h-full"
     >
-      <div className="relative aspect-[4/5] rounded-3xl overflow-hidden ring-1 ring-teal/20 shadow-glow-magenta bg-bg-deep transition-transform duration-300 group-hover:scale-[1.02]">
-        {imgFailed ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-            <img
-              src={`${import.meta.env.BASE_URL}calaba2.png`}
-              alt="CAL-ABA"
-              className="h-14 w-auto opacity-90"
-            />
-            <p className="mt-4 text-text-light font-semibold">{member.name}</p>
-            <p className="mt-1 text-gold-bright text-sm font-medium">{member.title}</p>
-          </div>
-        ) : (
-          <img
-            src={src}
-            alt={`${member.name}, ${member.title} at CAL-ABA`}
-            width={member.w}
-            height={member.h}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgFailed(true)}
-            className="absolute inset-0 h-full w-full object-contain"
-          />
-        )}
-      </div>
+      {/* The card IS the design now: headshot + frame + live text. StaffCard
+          owns the aspect-[9/11] box (CLS reservation) and the broken-photo
+          fallback, so a dead URL still renders a framed logo placeholder. */}
+      <StaffCard
+        photoUrl={member.src}
+        name={member.name}
+        title={member.title}
+        className="ring-1 ring-teal/20 shadow-glow-magenta transition-transform duration-300 group-hover:scale-[1.02]"
+      />
       <div className="mt-5 text-center">
         <h3 className="text-text-base font-bold text-xl">
           {member.name}

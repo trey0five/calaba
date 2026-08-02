@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ImageIcon, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import PublicStaffCard from '@/components/primitives/StaffCard';
 import { easeOutExpo, usePrefersReducedMotion } from '@/lib/motion';
 import { fieldBase, Label, PANEL_BLOOMS } from '@/lib/ui';
 import * as api from '../adminApi';
@@ -71,33 +72,41 @@ function StaffCard({
   const inner = (
     <div
       className={cn(
-        'relative overflow-hidden bg-bg-deep',
+        'relative overflow-hidden rounded-3xl bg-bg-deep',
         founder
-          ? 'aspect-[4/5] rounded-3xl sm:aspect-[3/2]'
-          : 'aspect-[4/5] rounded-3xl ring-1 ring-teal/20 shadow-glow-magenta',
+          ? 'aspect-[4/5] sm:aspect-[3/2]'
+          : 'ring-1 ring-teal/20 shadow-glow-magenta',
       )}
     >
-      {photo ? (
-        <img
-          src={photo}
-          alt={`${member.name}, ${member.title}`}
-          width={member.photo?.w || 900}
-          height={member.photo?.h || 1125}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-contain"
-        />
-      ) : (
-        <div className="absolute inset-0 grid place-items-center text-text-light/40">
-          <ImageIcon size={30} />
-        </div>
-      )}
+      {founder ? (
+        <>
+          {photo ? (
+            <img
+              src={photo}
+              alt={`${member.name}, ${member.title}`}
+              width={member.photo?.w || 900}
+              height={member.photo?.h || 600}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center text-text-light/40">
+              <ImageIcon size={30} />
+            </div>
+          )}
 
-      {/* Scrim + identity */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/90 via-ink-950/40 to-transparent p-4 pt-10">
-        <p className="truncate text-[15px] font-bold text-text-light">{member.name}</p>
-        <p className="truncate text-xs font-semibold text-gold-bright">{member.title}</p>
-      </div>
+          {/* Scrim + identity */}
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/90 via-ink-950/40 to-transparent p-4 pt-10">
+            <p className="truncate text-[15px] font-bold text-text-light">{member.name}</p>
+            <p className="truncate text-xs font-semibold text-gold-bright">{member.title}</p>
+          </div>
+        </>
+      ) : (
+        /* The real homepage card, composed from the headshot — so this grid is
+           literally "what families see" rather than a bare photo thumbnail. */
+        <PublicStaffCard photoUrl={photo || ''} name={member.name} title={member.title} />
+      )}
 
       {founder && (
         <span className="absolute left-3 top-3 rounded-full bg-gold px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-ink">
@@ -344,6 +353,12 @@ export default function Staff() {
     }
   };
 
+  /** What the drawer's dropzone thumbnail and live preview should show: the
+   *  headshot just picked, else the one already published. */
+  const previewPhoto = draft
+    ? draft.photo?.preview ?? staff.find((s) => s.id === draft.id)?.photo?.url ?? null
+    : null;
+
   const phaseLabel: Record<PublishPhase, string> = {
     idle: 'Save & publish',
     saving: 'Saving…',
@@ -373,7 +388,7 @@ export default function Staff() {
       {loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
           {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="aspect-[4/5]" />
+            <Skeleton key={i} className="aspect-[9/11]" />
           ))}
         </div>
       ) : ordered.length === 0 ? (
@@ -382,7 +397,7 @@ export default function Staff() {
             icon={<Users size={22} />}
             hue="teal"
             title="No team members yet"
-            body="Add the people families will meet. Each card shows a photo, a name and a title on the homepage."
+            body="Add the people families will meet. Upload a headshot and type a name and title — the card frame is added for you."
             action={
               <button type="button" onClick={() => setDraft({ ...EMPTY_DRAFT })} className={btnGold}>
                 <Plus size={17} />
@@ -464,11 +479,7 @@ export default function Staff() {
         {draft && (
           <div className="space-y-5">
             <UploadDropzone
-              currentPhoto={
-                draft.photo?.preview ??
-                staff.find((s) => s.id === draft.id)?.photo?.url ??
-                null
-              }
+              currentPhoto={previewPhoto}
               busy={phase === 'publishing' && !!draft.photo}
               done={!!draft.photo}
               onPicked={(photo) => {
@@ -539,34 +550,37 @@ export default function Staff() {
               </div>
             )}
 
-            {/* Live preview — the actual homepage card classes */}
+            {/* Live preview — the REAL homepage card, composed from the pending
+                headshot plus whatever is currently typed into the fields. */}
             <div>
               <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-teal-bright">
                 Live preview
               </p>
-              <div className="w-40">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-bg-deep ring-1 ring-teal/20 shadow-glow-magenta">
-                  {draft.photo?.preview || staff.find((s) => s.id === draft.id)?.photo?.url ? (
-                    <img
-                      src={
-                        draft.photo?.preview ||
-                        staff.find((s) => s.id === draft.id)?.photo?.url ||
-                        ''
-                      }
-                      alt=""
-                      className="absolute inset-0 h-full w-full object-contain"
-                    />
-                  ) : (
-                    <span className="absolute inset-0 grid place-items-center text-text-light/40">
-                      <ImageIcon size={24} />
-                    </span>
-                  )}
-                </div>
-                <p className="mt-3 text-center text-sm font-bold text-text-light">
-                  {draft.name || 'Name'}
-                </p>
-                <p className="mt-0.5 text-center text-[11px] font-semibold uppercase tracking-wide text-gold-bright">
-                  {draft.title || 'Title'}
+              <div className="w-52">
+                {draft.isFounder ? (
+                  <div className="relative aspect-[3/2] overflow-hidden rounded-3xl bg-bg-deep ring-1 ring-teal/20">
+                    {previewPhoto ? (
+                      <img
+                        src={previewPhoto}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-contain"
+                      />
+                    ) : (
+                      <span className="absolute inset-0 grid place-items-center text-text-light/40">
+                        <ImageIcon size={24} />
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <PublicStaffCard
+                    photoUrl={previewPhoto || ''}
+                    name={draft.name || 'Name'}
+                    title={draft.title || 'Title'}
+                    className="ring-1 ring-teal/20"
+                  />
+                )}
+                <p className="mt-3 text-center text-[11px] text-text-light/55">
+                  This is exactly how the card appears on the homepage.
                 </p>
               </div>
             </div>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -292,6 +292,72 @@ html {
 }
 .animate-approve-ring {
   animation: approve-ring 0.7s ease-out 1;
+}
+
+/* ── Staff card ───────────────────────────────────────────────────────────
+   The composed team card (src/components/primitives/StaffCard.tsx). Its type
+   is sized against the CARD, not the viewport, so the composite stays
+   proportional to the original 900x1100 artwork whether the card is 280px
+   wide in the mobile carousel or 380px in the desktop grid.
+
+   Each size ships twice on purpose: the clamp() is the fallback for engines
+   without container queries, the cqw line wins everywhere else. Values are
+   measured off public/eric-andrade.webp:
+     name  cap height 60px, baseline y=1023  (Playfair cap height = 0.70em)
+     title cap height 25px, baseline y=1080  (Inter    cap height = 0.727em) */
+.staff-card {
+  container-type: inline-size;
+}
+
+.staff-card-name {
+  margin: 0;
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  font-size: calc(clamp(20px, 3.4vw, 34px) * var(--staff-name-fit, 1));
+  font-size: calc(9.5cqw * var(--staff-name-fit, 1));
+  line-height: 1;
+  color: #f5b84f;
+  text-wrap: balance;
+  filter: drop-shadow(0 2px 7px rgba(20, 6, 2, 0.55));
+}
+
+.staff-card-rule-row {
+  display: flex;
+  width: 68%;
+  margin: 0 auto;
+  /* second declaration wins wherever container queries exist */
+  margin-top: 6px;
+  margin-top: 2.1cqw;
+  align-items: center;
+  gap: 3.2%;
+}
+
+/* Hairlines flanking the title, fading outward — as in the original design. */
+.staff-card-rule {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 1px;
+  background: linear-gradient(to right, rgba(245, 184, 79, 0), rgba(245, 184, 79, 0.85));
+}
+.staff-card-rule--right {
+  background: linear-gradient(to left, rgba(245, 184, 79, 0), rgba(245, 184, 79, 0.85));
+}
+
+.staff-card-title {
+  /* letter-spacing leaves a trailing space after the last glyph; cancelling it
+     puts the lettering on the card's true centre line, as in the original */
+  margin: 0 -0.175em 0 0;
+  flex: 0 1 auto;
+  font-weight: 700;
+  font-size: calc(clamp(11px, 1.6vw, 14px) * var(--staff-title-fit, 1));
+  font-size: calc(3.82cqw * var(--staff-title-fit, 1));
+  line-height: 1;
+  letter-spacing: 0.175em;
+  /* Sampled from the original lettering (peak rgb(110,189,180)); the brief's
+     #4FD8D0 reads noticeably brighter than the artwork it has to match. */
+  color: #68bcb3;
+  text-transform: uppercase;
+  filter: drop-shadow(0 1px 4px rgba(20, 6, 2, 0.5));
 }
 
 /* Hide horizontal scrollbar while keeping native scroll (mobile carousels) */

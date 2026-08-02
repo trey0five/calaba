@@ -14,7 +14,10 @@ export interface ProcessedPhoto {
   preview: string;
 }
 
-const MAX_EDGE = 1200;
+/** Headshots are composited into a ~560px-wide aperture on the site, so 800px
+ *  on the long edge is already 2x for retina — and well under the API's 2MB
+ *  decoded-payload cap. */
+const MAX_EDGE = 800;
 
 /** Decode with createImageBitmap where available, else an <img>. */
 async function decode(file: File): Promise<{ source: CanvasImageSource; w: number; h: number }> {
@@ -38,7 +41,7 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; w: numbe
 }
 
 /**
- * Resize to <=1200px on the long edge and re-encode as WebP BEFORE upload:
+ * Resize to <=800px on the long edge and re-encode as WebP BEFORE upload:
  * a phone photo is 4-8MB, and the API caps the decoded payload at 2MB.
  */
 export async function processPhoto(file: File): Promise<ProcessedPhoto> {
@@ -148,12 +151,12 @@ export default function UploadDropzone({
             : 'border-white/25 bg-white/[0.05] hover:border-teal-bright/50',
         )}
       >
+        {/* Square + circular, because that is exactly the aperture the headshot
+            lands in on the site — a 4:5 preview lied about what gets cropped. */}
         {currentPhoto && (
-          <img
-            src={currentPhoto}
-            alt=""
-            className="mx-auto mb-4 h-28 w-28 rounded-2xl object-cover ring-1 ring-white/15"
-          />
+          <span className="mx-auto mb-4 block aspect-square w-28 overflow-hidden rounded-full ring-1 ring-white/15">
+            <img src={currentPhoto} alt="" className="h-full w-full object-cover object-center" />
+          </span>
         )}
 
         <span
@@ -179,14 +182,18 @@ export default function UploadDropzone({
 
         <span className="mt-3 block text-[15px] font-semibold text-text-light">
           <span className="hidden sm:inline">
-            {working ? 'Preparing your photo…' : 'Drop a photo or click to choose'}
+            {working ? 'Preparing the headshot…' : 'Drop a headshot or click to choose'}
           </span>
           <span className="sm:hidden">
-            {working ? 'Preparing your photo…' : 'Tap to choose a photo'}
+            {working ? 'Preparing the headshot…' : 'Tap to choose a headshot'}
           </span>
         </span>
         <span className="mt-1 block text-xs text-text-light/60">
-          JPG/PNG/WebP · portrait works best (4:5) · converted to WebP on upload
+          Upload a headshot — head and shoulders, roughly square. The card frame, name and title
+          are added automatically.
+        </span>
+        <span className="mt-1 block text-[11px] text-text-light/45">
+          JPG/PNG/WebP · converted to WebP on upload
         </span>
 
         {(busy || working) && (
