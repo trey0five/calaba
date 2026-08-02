@@ -191,9 +191,13 @@ export default function ApplicationDialog() {
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
 
+  /* The role card that opened the dialog wins. The form keeps its values when
+     closed without submitting, so this must OVERWRITE rather than only fill a
+     blank — otherwise picking RBT, closing, then picking BCBA still says RBT. */
   useEffect(() => {
     if (!open || !presetPosition) return;
-    setValues((v) => (v.position ? v : { ...v, position: presetPosition }));
+    setValues((v) => (v.position === presetPosition ? v : { ...v, position: presetPosition }));
+    setErrors((e) => (e.position ? { ...e, position: undefined } : e));
   }, [open, presetPosition]);
 
   useEffect(() => {
