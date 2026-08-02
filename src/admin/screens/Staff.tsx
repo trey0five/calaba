@@ -1,6 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ImageIcon, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
+import { RefObject, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
+  GripVertical,
+  ImageIcon,
+  Pencil,
+  Pin,
+  Plus,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import PublicStaffCard from '@/components/primitives/StaffCard';
 import { easeOutExpo, usePrefersReducedMotion } from '@/lib/motion';
@@ -176,6 +189,148 @@ function StaffCard({
   );
 }
 
+/* ------------------------------------------------------------------ *
+ * Reordering
+ *
+ * Framer Motion's <Reorder> only ever compares positions along ONE axis, so
+ * dragging inside the wrapping 2/3-column card grid would compare a card in
+ * row 2 against a card in row 1 and swap the wrong people. Reordering
+ * therefore happens in a dedicated single-column mode, which also keeps drag
+ * from ever fighting the hover action bar (Replace photo / Edit / Remove) on
+ * the cards.
+ * ------------------------------------------------------------------ */
+
+/** Rapid clicks on the arrows coalesce into ONE batch of PUTs. */
+const ORDER_FLUSH_MS = 500;
+
+const rowShell =
+  'flex items-center gap-3 rounded-2xl bg-white/[0.06] p-2.5 ring-1 ring-white/10';
+
+function RowThumb({ member }: { member: StaffMember }) {
+  return (
+    <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-bg-deep ring-1 ring-white/10">
+      {member.photo?.url ? (
+        <img src={member.photo.url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className="grid h-full w-full place-items-center text-text-light/40">
+          <ImageIcon size={16} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+function TeamOrderRow({
+  member,
+  index,
+  total,
+  draggable,
+  reduced,
+  constraints,
+  onMove,
+  onDragStarted,
+  onDragSettled,
+}: {
+  member: StaffMember;
+  index: number;
+  total: number;
+  draggable: boolean;
+  reduced: boolean;
+  constraints: RefObject<HTMLElement>;
+  onMove: (dir: -1 | 1) => void;
+  onDragStarted: () => void;
+  onDragSettled: () => void;
+}) {
+  const controls = useDragControls();
+  const upRef = useRef<HTMLButtonElement>(null);
+  const downRef = useRef<HTMLButtonElement>(null);
+
+  const move = (dir: -1 | 1) => {
+    onMove(dir);
+    // The row keeps its DOM node through the reorder, so focus survives — but a
+    // button that has just become disabled is blurred by the browser. Hand
+    // focus to the opposite arrow so a keyboard user never lands on <body>.
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => {
+        const pressed = dir === -1 ? upRef.current : downRef.current;
+        if (pressed?.disabled) (dir === -1 ? downRef : upRef).current?.focus();
+      });
+    }
+  };
+
+  const arrow =
+    'relative grid h-9 w-9 place-items-center rounded-full bg-ink-950/70 text-text-light ring-1 ring-white/20 transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-ink-950/70';
+
+  return (
+    <Reorder.Item
+      value={member.id}
+      drag={draggable ? 'y' : false}
+      dragListener={false}
+      dragControls={controls}
+      dragConstraints={constraints}
+      dragElastic={0.06}
+      onDragStart={onDragStarted}
+      onDragEnd={onDragSettled}
+      transition={reduced ? { duration: 0 } : { duration: 0.3, ease: easeOutExpo }}
+      className={cn(rowShell, 'list-none')}
+    >
+      {/* Pointer affordance only, and only where there is room for it: on a
+          phone the row needs that 44px for the name, and the arrows are the
+          touch path anyway. */}
+      {draggable ? (
+        <span
+          onPointerDown={(e) => controls.start(e)}
+          className="hidden h-11 w-11 shrink-0 cursor-grab touch-none place-items-center rounded-xl text-text-light/45 transition hover:text-text-light/80 active:cursor-grabbing sm:grid"
+          aria-hidden="true"
+        >
+          <GripVertical size={18} />
+        </span>
+      ) : (
+        <span className="hidden h-11 w-11 shrink-0 sm:block" aria-hidden="true" />
+      )}
+
+      <RowThumb member={member} />
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-text-light">{member.name}</span>
+        <span className="block truncate text-xs text-text-light/65">
+          {member.title || 'No title yet'}
+        </span>
+      </span>
+
+      <span
+        className="hidden shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold tabular-nums text-text-light/70 sm:inline-block"
+        aria-hidden="true"
+      >
+        {index + 1} / {total}
+      </span>
+
+      <span className="flex shrink-0 items-center gap-2">
+        <button
+          ref={upRef}
+          type="button"
+          disabled={index === 0}
+          onClick={() => move(-1)}
+          aria-label={`Move ${member.name} up`}
+          className={cn(arrow, HIT_AREA, focusRing)}
+        >
+          <ArrowUp size={16} />
+        </button>
+        <button
+          ref={downRef}
+          type="button"
+          disabled={index === total - 1}
+          onClick={() => move(1)}
+          aria-label={`Move ${member.name} down`}
+          className={cn(arrow, HIT_AREA, focusRing)}
+        >
+          <ArrowDown size={16} />
+        </button>
+      </span>
+    </Reorder.Item>
+  );
+}
+
 export default function Staff() {
   const { authed } = useAuth();
   const { staff, loading, setStaff, logActivity } = useAdminData();
@@ -189,9 +344,144 @@ export default function Staff() {
   const [focusPhoto, setFocusPhoto] = useState(false);
   const savingRef = useRef(false);
 
+  const [reordering, setReordering] = useState(false);
+  const [orderNote, setOrderNote] = useState('');
+  const [savingOrder, setSavingOrder] = useState(false);
+  const listRef = useRef<HTMLUListElement>(null);
+
   const ordered = [...staff].sort(
     (a, b) => Number(!!b.isFounder) - Number(!!a.isFounder) || (a.order ?? 0) - (b.order ?? 0),
   );
+  /* The founder is pinned by `isFounder`, not by `order`, so they are held out
+     of the reorderable set entirely rather than just sorted to the front. */
+  const pinned = ordered.filter((s) => s.isFounder);
+  const members = ordered.filter((s) => !s.isFounder);
+
+  /* --------------------------- order plumbing --------------------------- */
+
+  /** Latest committed staff, readable from the debounce timer. */
+  const staffRef = useRef(staff);
+  useEffect(() => {
+    staffRef.current = staff;
+  }, [staff]);
+  /** Last server-confirmed list — the rollback target for a whole burst. */
+  const baselineRef = useRef<StaffMember[] | null>(null);
+  const flushTimer = useRef<number | null>(null);
+  /** A drag fires onReorder once per row it crosses; hold the write until it
+   *  is let go so one gesture is one batch. */
+  const draggingRef = useRef(false);
+  const flushingRef = useRef(false);
+
+  const flushOrder = async () => {
+    flushTimer.current = null;
+    // Never overlap two batches: the second would take the first's optimistic
+    // state as its rollback target, and a failure would strand the difference.
+    if (flushingRef.current) {
+      scheduleFlush();
+      return;
+    }
+    const baseline = baselineRef.current;
+    baselineRef.current = null;
+    if (!baseline) return;
+    const changed = staffRef.current.filter(
+      (s) => !s.isFounder && (baseline.find((b) => b.id === s.id)?.order ?? 0) !== s.order,
+    );
+    if (!changed.length) return;
+    flushingRef.current = true;
+    setSavingOrder(true);
+    const written: StaffMember[] = [];
+    try {
+      // Sequential on purpose: every PUT is a read-modify-write of the same
+      // staff.json object behind an ETag, and firing them in parallel just
+      // burns the server's three retries against itself.
+      for (const m of changed) {
+        await authed((t) => api.updateStaff(t, m.id, { order: m.order }));
+        written.push(m);
+      }
+      // Also clears the cached public payload, so the homepage picks the new
+      // running order up on the next paint rather than after the TTL.
+      logActivity('Reordered the team', 'teal');
+    } catch (err) {
+      setStaff(() => baseline);
+      // A batch that died halfway leaves the server holding part of the new
+      // order while the screen shows the old one. Put back what already
+      // landed, so "the previous order was restored" is true of the site too.
+      let undone = true;
+      for (const m of written) {
+        const was = baseline.find((b) => b.id === m.id)?.order ?? 0;
+        try {
+          await authed((t) => api.updateStaff(t, m.id, { order: was }));
+        } catch {
+          undone = false;
+        }
+      }
+      const tail = undone
+        ? 'The previous order was restored.'
+        : 'Refresh the page to see the order the site is actually using.';
+      setOrderNote(tail);
+      push({
+        tone: 'error',
+        title: 'Couldn’t save the new order',
+        body: err instanceof api.ApiError ? `${err.message} ${tail}` : `Check your connection and try again — ${tail.charAt(0).toLowerCase()}${tail.slice(1)}`,
+      });
+    } finally {
+      flushingRef.current = false;
+      setSavingOrder(false);
+    }
+  };
+
+  // The unmount/leave flush must not be re-created on every render, or its
+  // cleanup would fire a write each time `authed` changed identity.
+  const flushRef = useRef(flushOrder);
+  useEffect(() => {
+    flushRef.current = flushOrder;
+  });
+  useEffect(
+    () => () => {
+      if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
+      if (baselineRef.current) void flushRef.current();
+    },
+    [],
+  );
+
+  const scheduleFlush = () => {
+    if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
+    flushTimer.current = window.setTimeout(() => void flushOrder(), ORDER_FLUSH_MS);
+  };
+
+  /** Write immediately — leaving reorder mode, or unmounting. */
+  const flushNow = () => {
+    if (flushTimer.current !== null) {
+      window.clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+    }
+    if (baselineRef.current) void flushOrder();
+  };
+
+  /** Adopt a new running order optimistically, renumbered densely from 0. */
+  const applyOrder = (ids: string[]) => {
+    // A drawer owns the screen while it is open; nothing behind it may move.
+    if (draft) return;
+    if (!baselineRef.current) baselineRef.current = staffRef.current;
+    const rank = new Map(ids.map((id, i) => [id, i] as const));
+    setStaff((prev) =>
+      prev.map((s) => {
+        const next = rank.get(s.id);
+        return next === undefined || s.isFounder || s.order === next ? s : { ...s, order: next };
+      }),
+    );
+    if (!draggingRef.current) scheduleFlush();
+  };
+
+  const moveMember = (index: number, dir: -1 | 1) => {
+    const to = index + dir;
+    if (to < 0 || to >= members.length) return;
+    const next = [...members];
+    const [moved] = next.splice(index, 1);
+    next.splice(to, 0, moved);
+    applyOrder(next.map((m) => m.id));
+    setOrderNote(`Moved ${moved.name} to position ${to + 1} of ${next.length}`);
+  };
 
   /* Reset the publish state machine whenever the drawer OPENS (or switches to a
      different member). `draft` is a fresh object on every render, so depending
@@ -376,14 +666,52 @@ export default function Staff() {
             The <span className="brand-gradient-text-bright">team</span>
           </>
         }
-        sub="These cards are what families see on the homepage."
+        sub={
+          reordering
+            ? 'Top to bottom here is left to right on the homepage.'
+            : 'These cards are what families see on the homepage.'
+        }
         actions={
-          <button type="button" onClick={() => setDraft({ ...EMPTY_DRAFT })} className={btnGold}>
-            <Plus size={17} />
-            Add team member
-          </button>
+          reordering ? (
+            <button
+              type="button"
+              onClick={() => {
+                setReordering(false);
+                flushNow();
+              }}
+              aria-pressed
+              className={btnGold}
+            >
+              <Check size={17} />
+              Done
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              {members.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setReordering(true)}
+                  aria-pressed={false}
+                  className={btnGhost}
+                >
+                  <ArrowUpDown size={17} />
+                  Reorder
+                </button>
+              )}
+              <button type="button" onClick={() => setDraft({ ...EMPTY_DRAFT })} className={btnGold}>
+                <Plus size={17} />
+                Add team member
+              </button>
+            </div>
+          )
         }
       />
+
+      {/* Persistent live region — a region that appears at the same moment its
+          text does is usually skipped by screen readers. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {orderNote}
+      </p>
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
@@ -405,6 +733,76 @@ export default function Staff() {
               </button>
             }
           />
+        </div>
+      ) : reordering ? (
+        <div className={cn(glassCard, 'space-y-4')}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="max-w-md text-sm text-text-light/75">
+              Use the arrows to move someone up or down — they work on a phone and with a
+              keyboard. On a computer you can also drag a row by its handle. Changes save on their
+              own.
+            </p>
+            <span
+              className="inline-flex min-h-[1.5rem] items-center gap-2 text-xs font-semibold text-teal-bright"
+              aria-hidden="true"
+            >
+              {savingOrder && <Working label="Saving order…" />}
+            </span>
+          </div>
+
+          {pinned.map((member) => (
+            <div key={member.id} className={cn(rowShell, 'opacity-90')}>
+              <span
+                className="hidden h-11 w-11 shrink-0 place-items-center rounded-xl text-gold-bright sm:grid"
+                aria-hidden="true"
+              >
+                <Pin size={17} />
+              </span>
+              <RowThumb member={member} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-text-light">
+                  {member.name}
+                </span>
+                <span className="block truncate text-xs text-text-light/65">{member.title}</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-gold-bright ring-1 ring-gold/30">
+                Always first
+              </span>
+            </div>
+          ))}
+
+          <Reorder.Group
+            ref={listRef}
+            as="ul"
+            axis="y"
+            values={members.map((m) => m.id)}
+            onReorder={applyOrder}
+            className="m-0 list-none space-y-3 p-0"
+          >
+            {members.map((member, i) => (
+              <TeamOrderRow
+                key={member.id}
+                member={member}
+                index={i}
+                total={members.length}
+                /* No drag springs under reduced motion, and nothing moves while
+                   an edit drawer owns the screen. The arrows remain the
+                   guaranteed path either way. */
+                draggable={!reduced && !draft}
+                reduced={reduced}
+                constraints={listRef}
+                onMove={(dir) => moveMember(i, dir)}
+                onDragStarted={() => {
+                  draggingRef.current = true;
+                }}
+                onDragSettled={() => {
+                  draggingRef.current = false;
+                  setOrderNote(`Moved ${member.name} to position ${i + 1} of ${members.length}`);
+                  if (baselineRef.current) scheduleFlush();
+                }}
+              />
+            ))}
+          </Reorder.Group>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
