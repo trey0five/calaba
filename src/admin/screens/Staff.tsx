@@ -352,6 +352,10 @@ export default function Staff() {
   const ordered = [...staff].sort(
     (a, b) => Number(!!b.isFounder) - Number(!!a.isFounder) || (a.order ?? 0) - (b.order ?? 0),
   );
+  // Rendered as two separate sections: the founder's card is landscape and the
+  // team's are portrait, so they cannot share a grid without leaving a gap.
+  const founderMember = ordered.find((m) => m.isFounder) ?? null;
+  const teamMembers = ordered.filter((m) => !m.isFounder);
   /* The founder is pinned by `isFounder`, not by `order`, so they are held out
      of the reorderable set entirely rather than just sorted to the front. */
   const pinned = ordered.filter((s) => s.isFounder);
@@ -805,8 +809,44 @@ export default function Staff() {
           </Reorder.Group>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-          {ordered.map((member) => (
+        <div className="space-y-10">
+          {/* The founder's card is a landscape 3:2 design while team cards are
+              portrait 9:11 — mixing them in one grid left a ragged hole. They
+              get their own row, which also matches how the homepage reads:
+              founder section first, then the team. */}
+          {founderMember && (
+            <section>
+              <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-gold-bright">
+                Founder
+              </h3>
+              <div className="max-w-md">
+                <StaffCard
+                  key={founderMember.id}
+                  member={founderMember}
+                  ringing={ringing === founderMember.id}
+                  onEdit={() => openEdit(founderMember)}
+                  onReplacePhoto={() => openEdit(founderMember, true)}
+                  onRemove={() => {}}
+                />
+              </div>
+            </section>
+          )}
+
+          <section>
+            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-teal-bright">
+              Team {teamMembers.length > 0 && (
+                <span className="ml-1 font-semibold text-text-light/55">
+                  {teamMembers.length}
+                </span>
+              )}
+            </h3>
+            {teamMembers.length === 0 ? (
+              <p className="rounded-2xl bg-white/[0.05] px-5 py-6 text-sm text-text-light/65 ring-1 ring-white/10">
+                No team members yet — add one and their card builds itself.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                {teamMembers.map((member) => (
             <StaffCard
               key={member.id}
               member={member}
@@ -827,8 +867,11 @@ export default function Staff() {
                   onConfirm: () => remove(member),
                 })
               }
-            />
-          ))}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
 
