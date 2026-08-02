@@ -4,7 +4,7 @@ export const site = {
   brand: 'CAL-ABA',
   logo: logoUrl,
   contact: {
-    email: 'Info.Calaba@gmail.com',
+    email: 'admin@calabatherapy.com',
     phone: '(954) 599-2260',
     /**
      * Consultation-form delivery. GitHub Pages is static, so the browser has
