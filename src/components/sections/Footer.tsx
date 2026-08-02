@@ -66,7 +66,6 @@ export default function Footer() {
               Contact
             </h4>
             <ul className="space-y-2 text-sm text-text-light/80">
-              <li>{site.contact.address}</li>
               <li>
                 <a href={`tel:${site.contact.phone.replace(/[^\d+]/g, '')}`} className="hover:text-gold">
                   {site.contact.phone}

@@ -41,7 +41,6 @@ export const site = {
       cloudName: '',
       uploadPreset: '',
     },
-    address: 'Florida (PLACEHOLDER street, city, ZIP)',
     hours: 'Mon-Fri 8am-6pm',
   },
   navLinks: [
