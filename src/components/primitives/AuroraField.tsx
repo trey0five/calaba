@@ -351,7 +351,8 @@ const PRESETS: Record<AuroraVariant, Preset> = {
   footer: {
     field: '#140A2E',
     grain: 0.06,
-    seamTop: '#140A2E',
+    // No seamTop: the bloom band below IS the top-edge treatment, and a seam
+    // wash over it clipped the band and left a visible horizontal line.
     layers: [
       // one wide low-alpha multi-hue bloom band along the top edge only
       {
