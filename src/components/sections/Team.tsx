@@ -50,11 +50,14 @@ function MemberCard({ member, index }: { member: Member; index: number }) {
         title={member.title}
         className="ring-1 ring-teal/20 shadow-glow-magenta transition-transform duration-300 group-hover:scale-[1.02]"
       />
+      {/* caption steps down at lg where the grid goes 4-up and each column
+          loses ~25% of its width — long titles ("Clinical Supervisor BCBA")
+          otherwise wrap to three lines and desync the row baselines */}
       <div className="mt-5 text-center">
-        <h3 className="text-text-base font-bold text-xl">
+        <h3 className="text-text-base font-bold text-xl lg:text-lg xl:text-xl">
           {member.name}
         </h3>
-        <p className="mt-1 text-gold-deep font-semibold text-sm tracking-wide uppercase">
+        <p className="mt-1 text-gold-deep font-semibold text-sm lg:text-xs xl:text-sm tracking-wide uppercase">
           {member.title}
         </p>
       </div>
@@ -125,9 +128,12 @@ export default function Team() {
           </p>
         </Reveal>
 
+        {/* 3-up from md, 4-up from lg. The roster grows over time, so the grid
+            wraps rather than assuming a fixed headcount — a 5th member starts a
+            second row instead of squeezing the first. */}
         <div
           data-auto-carousel
-          className="mt-14 flex items-stretch overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 -mx-6 px-6 pt-2 pb-4 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:items-stretch"
+          className="mt-14 flex items-stretch overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 -mx-6 px-6 pt-2 pb-4 md:grid md:grid-cols-3 md:gap-6 lg:grid-cols-4 lg:gap-7 md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:items-stretch"
         >
           {team.map((member, i) => (
             <MemberCard key={member.name} member={member} index={i} />
