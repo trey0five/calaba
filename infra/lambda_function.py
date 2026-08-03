@@ -76,6 +76,15 @@ EMAIL_RE = re.compile(r'^[^@\s,;:<>"\\]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,2
 REVIEW_STATUSES = ('pending', 'approved', 'rejected')
 APPLICATION_STATUSES = ('new', 'reviewed', 'contacted', 'rejected')
 
+# Who wrote the review. Every record predating this field is a family review —
+# `audience_of()` is the ONLY way this is read, so a missing field can never be
+# mistaken for a staff review and leak into the wrong endpoint.
+REVIEW_AUDIENCES = ('family', 'staff')
+DEFAULT_AUDIENCE = 'family'
+STAFF_RELATIONSHIPS = ('Current team member', 'Former team member')
+ANON_TEAM_ATTRIBUTION = 'Anonymous team member'
+ANON_TEAM_INITIALS = 'TM'
+
 # Keys
 K_REVIEWS = 'private/data/reviews.json'
 K_STAFF = 'private/data/staff.json'
@@ -681,6 +690,59 @@ def review_email(record):
     )
 
 
+def team_review_email(record):
+    """The owner's copy of a staff review. This one DOES show the real full
+    name — the whole point of collecting it — and states, right beside it, the
+    only string the public will ever see."""
+    sub = record['submission']
+    display = record.get('display') or {}
+    rating = int(sub.get('rating') or 0)
+    stars = '★' * rating + '☆' * (5 - rating)
+    consent = sub.get('consent') is True
+    anonymous = sub.get('anonymous') is True
+    attribution = display.get('attribution') or ANON_TEAM_ATTRIBUTION
+    consent_text = ('YES — may be published on the website' if consent
+                    else 'NO — private feedback only')
+    banner = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+              f'style="background:#FBF6EC;border-left:3px solid {GOLD};border-radius:0 10px 10px 0;margin-bottom:24px;">'
+              f'<tr><td style="padding:14px 16px;">'
+              f'<div style="color:{MAGENTA};font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;">Permission to publish</div>'
+              f'<div style="color:{TEXT};font-size:15px;font-weight:700;">{html.escape(consent_text)}</div>'
+              f'<div style="color:{MUTED};font-size:13px;margin-top:6px;">Shown on the site as: '
+              f'<strong style="color:{TEXT};">{html.escape(attribution)}</strong>'
+              f'{" (they asked to publish anonymously)" if anonymous else ""}</div>'
+              f'</td></tr></table>')
+    body = (
+        banner
+        + eyebrow('The review')
+        + f'<div style="color:{TEXT};font-size:18px;font-weight:700;line-height:1.4;margin-bottom:10px;">{dash(sub.get("headline"))}</div>'
+        + quote_block(sub.get('review') or '')
+        + eyebrow('Who wrote it')
+        + rows_table([
+            ('Full name (private)', dash(sub.get('fullName'))),
+            ('Published as', html.escape(attribution)),
+            ('Email', f'<a href="mailto:{html.escape(sub.get("email") or "")}" style="color:#0E5A56;text-decoration:none;">{dash(sub.get("email"))}</a>'),
+            ('Current / former', dash(sub.get('relationship'))),
+            ('Role', dash(sub.get('role'))),
+            ('Time at CAL-ABA', dash(sub.get('tenure'))),
+            ('Rating', f'{rating} / 5'),
+        ])
+    )
+    eyebrow_html = (
+        f'<div style="color:#FFC44D;font-size:26px;letter-spacing:4px;margin-top:10px;">{stars}</div>'
+        f'<div style="color:#F4EEFB;font-size:14px;font-weight:600;margin-top:4px;">{rating} out of 5</div>'
+        f'<div style="color:#B9A8D4;font-size:13px;margin-top:8px;">{html.escape(record["createdAt"])}</div>'
+    )
+    subject_prefix = '' if consent else '[PRIVATE FEEDBACK] '
+    # The subject carries the PUBLISHED attribution, not the surname — inbox
+    # previews and mail logs are the last place a private name should surface.
+    subject = f'{subject_prefix}New team review — {attribution[:60]}'
+    return subject, email_shell(
+        'New team review submitted', eyebrow_html, body,
+        'Team reviews are held for your approval — nothing is published automatically',
+    )
+
+
 def application_email(record):
     values = record['values']
     resume = record.get('resume') or {}
@@ -758,6 +820,62 @@ def derive_display(submission, order):
     }
 
 
+def audience_of(record):
+    """The ONE reader of `audience`. Anything that is not exactly 'staff' — a
+    missing field on the four imported samples, a typo, a non-string — is a
+    family review, so no existing record can drift into the staff endpoint."""
+    value = record.get('audience') if isinstance(record, dict) else None
+    return value if value in REVIEW_AUDIENCES else DEFAULT_AUDIENCE
+
+
+def team_attribution(full_name, anonymous):
+    """Published credit for a team review. The form collects the FULL name
+    because the owner needs to know who wrote it; what ships to the public is
+    only ever 'Anonymous team member' or 'Morgan M.'. The surname never leaves
+    this function — callers get the initial, not the word."""
+    if anonymous:
+        return ANON_TEAM_ATTRIBUTION
+    parts = [p for p in (full_name or '').split() if p]
+    if not parts:
+        return ANON_TEAM_ATTRIBUTION
+    if len(parts) == 1:
+        # A single-word name has no surname to protect, but it also must not be
+        # a whole identity by accident — a lone first name is fine.
+        return parts[0]
+    return f'{parts[0]} {parts[-1][0].upper()}.'
+
+
+def team_initials(full_name, anonymous):
+    """Avatar letters, from the same source as the attribution. The surname's
+    first letter is already public in 'Morgan M.', so it adds nothing new."""
+    if anonymous:
+        return ANON_TEAM_INITIALS
+    parts = [p for p in re.findall(r'[A-Za-z]+', full_name or '')]
+    if not parts:
+        return ANON_TEAM_INITIALS
+    if len(parts) == 1:
+        return parts[0][0].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def derive_team_display(submission, order):
+    """`display` for a staff review. Deliberately carries no name field other
+    than the derived attribution — nothing here can be traced back to the
+    surname stored in `submission.fullName`."""
+    anonymous = submission.get('anonymous') is True
+    full_name = submission.get('fullName') or ''
+    return {
+        'quote': submission.get('review', ''),
+        'attribution': team_attribution(full_name, anonymous),
+        'role': submission.get('role', ''),
+        'tenure': submission.get('tenure', ''),
+        'relationship': submission.get('relationship', ''),
+        'rating': int(submission.get('rating') or 5),
+        'initials': team_initials(full_name, anonymous),
+        'order': order,
+    }
+
+
 def sanitize_filename(name):
     """Sanitise the STEM only and re-attach the extension. Sanitising the whole
     string destroyed the extension for non-Latin names (`简历.pdf` collapsed to
@@ -778,16 +896,64 @@ def sanitize_filename(name):
 PUBLIC_CACHE = {'Cache-Control': 'public,max-age=300'}
 
 
+def _publishable(record):
+    """The consent gate, in one place. Approved AND explicitly consented — a
+    missing `consent` is not consent."""
+    return (record.get('status') == 'approved'
+            and (record.get('submission') or {}).get('consent') is True
+            and isinstance(record.get('display'), dict))
+
+
 def public_testimonials(origin):
     reviews = read_json(K_REVIEWS, [])
     if not isinstance(reviews, list):
         raise StoreUnavailable('reviews.json is not a list')
     items = [
         r['display'] for r in reviews
-        if r.get('status') == 'approved'
-        and (r.get('submission') or {}).get('consent') is True
-        and isinstance(r.get('display'), dict)
+        # Family only. Staff reviews live at /api/public/team-reviews and must
+        # never reach the homepage carousel.
+        if audience_of(r) == 'family' and _publishable(r)
     ]
+    items.sort(key=lambda d: (d.get('order', 0), d.get('quote', '')))
+    return respond(200, items, origin, PUBLIC_CACHE)
+
+
+TEAM_DISPLAY_FIELDS = ('quote', 'attribution', 'role', 'tenure', 'relationship',
+                       'rating', 'initials', 'order')
+
+
+def public_team_reviews(origin):
+    """Approved + consented staff reviews.
+
+    The payload is rebuilt field by field from an allow-list rather than
+    handed straight out of the record: a stray key on `display` (or a
+    hand-edited reviews.json) can never carry an email, an IP or a surname out
+    of here. `attribution` and `initials` are RE-DERIVED from the submission on
+    every request, so the published credit is what the server computes, never
+    what anything upstream stored.
+    """
+    reviews = read_json(K_REVIEWS, [])
+    if not isinstance(reviews, list):
+        raise StoreUnavailable('reviews.json is not a list')
+    items = []
+    for r in reviews:
+        if audience_of(r) != 'staff' or not _publishable(r):
+            continue
+        display = r['display']
+        submission = r.get('submission') or {}
+        anonymous = submission.get('anonymous') is True
+        item = {k: display.get(k, '') for k in TEAM_DISPLAY_FIELDS}
+        item['attribution'] = team_attribution(submission.get('fullName'), anonymous)
+        item['initials'] = team_initials(submission.get('fullName'), anonymous)
+        try:
+            item['rating'] = max(1, min(5, int(display.get('rating') or 5)))
+        except (TypeError, ValueError):
+            item['rating'] = 5
+        try:
+            item['order'] = int(display.get('order') or 0)
+        except (TypeError, ValueError):
+            item['order'] = 0
+        items.append(item)
     items.sort(key=lambda d: (d.get('order', 0), d.get('quote', '')))
     return respond(200, items, origin, PUBLIC_CACHE)
 
@@ -831,6 +997,10 @@ def post_review(event, body, origin):
     if gate:
         return err(400, gate, origin)
 
+    audience = clean(body.get('audience'), 20) or DEFAULT_AUDIENCE
+    if audience not in REVIEW_AUDIENCES:
+        return err(400, 'Unknown review type.', origin)
+
     try:
         rating = int(body.get('rating') or 0)
     except (TypeError, ValueError):
@@ -841,25 +1011,51 @@ def post_review(event, body, origin):
     if len(review_text) < 10:
         return err(400, 'Please tell us a little more about your experience.', origin)
 
-    submission = {
-        'rating': rating,
-        'headline': clean(body.get('headline')),
-        'review': review_text,
-        'name': clean(body.get('name')),
-        'credit': clean(body.get('credit')),
-        'email': clean(body.get('email'), 254),
-        'relationship': clean(body.get('relationship')),
-        'location': clean(body.get('location')),
-        'service': clean(body.get('service')),
-        'consent': body.get('consent') is True,
-    }
+    if audience == 'staff':
+        full_name = clean(body.get('fullName'))
+        if not full_name:
+            return err(400, 'Please tell us your full name.', origin)
+        relationship = clean(body.get('relationship'))
+        if relationship not in STAFF_RELATIONSHIPS:
+            relationship = STAFF_RELATIONSHIPS[0]
+        submission = {
+            'rating': rating,
+            'headline': clean(body.get('headline')),
+            'review': review_text,
+            # The real name, kept for the owner only. `display` never quotes it.
+            'fullName': full_name,
+            'anonymous': body.get('anonymous') is True,
+            'role': clean(body.get('role')),
+            'tenure': clean(body.get('tenure')),
+            'email': clean(body.get('email'), 254),
+            'relationship': relationship,
+            'consent': body.get('consent') is True,
+        }
+        display = derive_team_display(submission, 0)
+        build_email = team_review_email
+    else:
+        submission = {
+            'rating': rating,
+            'headline': clean(body.get('headline')),
+            'review': review_text,
+            'name': clean(body.get('name')),
+            'credit': clean(body.get('credit')),
+            'email': clean(body.get('email'), 254),
+            'relationship': clean(body.get('relationship')),
+            'location': clean(body.get('location')),
+            'service': clean(body.get('service')),
+            'consent': body.get('consent') is True,
+        }
+        display = derive_display(submission, 0)
+        build_email = review_email
 
     record = {
         'id': new_id('rv', 8),
         'createdAt': now_iso(),
         'status': 'pending',
+        'audience': audience,
         'submission': submission,
-        'display': derive_display(submission, 0),
+        'display': display,
         'moderation': {'decidedAt': None, 'decidedBy': None, 'note': ''},
         'source': {'ip': ip, 'userAgent': user_agent(event)},
     }
@@ -872,7 +1068,7 @@ def post_review(event, body, origin):
 
     mutate_json(K_REVIEWS, [], apply)       # store FIRST (503 on failure)
 
-    subject, body_html = review_email(record)
+    subject, body_html = build_email(record)
     send_email(subject, body_html, submission['email'])   # then email (never fatal)
     return respond(200, {'ok': True, 'id': record['id']}, origin)
 
@@ -1141,9 +1337,17 @@ def admin_reviews_list(event, origin):
     for r in reviews:
         if r.get('status') in counts:
             counts[r['status']] += 1
-    status = ((event.get('queryStringParameters') or {}) or {}).get('status')
+    # Stamped on the way OUT, not migrated in the store: the admin can segment
+    # on `audience` while the four imported records stay byte-identical on S3.
+    reviews = [dict(r, audience=audience_of(r)) if isinstance(r, dict) else r
+               for r in reviews]
+    params = (event.get('queryStringParameters') or {}) or {}
+    status = params.get('status')
     if status in REVIEW_STATUSES:
         reviews = [r for r in reviews if r.get('status') == status]
+    audience = params.get('audience')
+    if audience in REVIEW_AUDIENCES:
+        reviews = [r for r in reviews if r.get('audience') == audience]
     reviews = sorted(reviews, key=lambda r: r.get('createdAt', ''), reverse=True)
     return respond(200, {'items': reviews, 'counts': counts}, origin)
 
@@ -1171,10 +1375,13 @@ def admin_review_update(claims, review_id, body, origin):
                 'note': clean(body.get('note'), MAX_STRING) or (match.get('moderation') or {}).get('note', ''),
             }
 
+        is_staff = audience_of(match) == 'staff'
         display_patch = body.get('display')
         if isinstance(display_patch, dict):
             display = dict(match.get('display') or {})
-            for field in ('quote', 'attribution', 'location', 'service', 'initials'):
+            editable = (('quote', 'role', 'tenure', 'relationship') if is_staff
+                        else ('quote', 'attribution', 'location', 'service', 'initials'))
+            for field in editable:
                 if field in display_patch:
                     display[field] = clean(
                         display_patch[field],
@@ -1191,13 +1398,26 @@ def admin_review_update(claims, review_id, body, origin):
                     pass
             match['display'] = display
 
+        if is_staff:
+            # Not editable, by design: the published credit for a team review is
+            # always what the server derives from the stored full name. An admin
+            # (or a crafted PUT) cannot promote a surname onto the public site.
+            submission = match.get('submission') or {}
+            anonymous = submission.get('anonymous') is True
+            staff_display = dict(match.get('display') or {})
+            staff_display['attribution'] = team_attribution(submission.get('fullName'), anonymous)
+            staff_display['initials'] = team_initials(submission.get('fullName'), anonymous)
+            match['display'] = staff_display
+
         if 'order' in body:
             try:
                 match.setdefault('display', {})['order'] = int(body['order'])
             except (TypeError, ValueError):
                 pass
 
-        return reviews, respond(200, match, origin)
+        # Same out-bound stamp as the list route so the client never has to
+        # guess which segment an edited record belongs to.
+        return reviews, respond(200, dict(match, audience=audience_of(match)), origin)
 
     return mutate_json(K_REVIEWS, [], apply)
 
@@ -1592,6 +1812,8 @@ def lambda_handler(event, context):
         # ---------- PUBLIC ----------
         if method == 'GET' and path == '/api/public/testimonials':
             return public_testimonials(origin)
+        if method == 'GET' and path == '/api/public/team-reviews':
+            return public_team_reviews(origin)
         if method == 'GET' and path == '/api/public/staff':
             return public_staff(origin)
         if method == 'POST' and path == '/api/reviews':

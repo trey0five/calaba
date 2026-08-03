@@ -123,6 +123,7 @@ function cacheWrite(key: string, data: unknown) {
 export function clearPublicCache() {
   try {
     sessionStorage.removeItem('calaba:testimonials');
+    sessionStorage.removeItem('calaba:teamReviews');
     sessionStorage.removeItem('calaba:staff');
   } catch {
     /* ignore */
@@ -138,6 +139,22 @@ export interface Testimonial {
   attribution: string;
   location: string;
   service: string;
+  initials: string;
+  rating: number;
+  order?: number;
+}
+
+/**
+ * A published staff review. There is no name field beyond `attribution`, and
+ * `attribution` is derived by the server — either "Anonymous team member" or
+ * "Morgan M.". The full name the reviewer typed never leaves the admin.
+ */
+export interface TeamReview {
+  quote: string;
+  attribution: string;
+  role: string;
+  tenure: string;
+  relationship: string;
   initials: string;
   rating: number;
   order?: number;
@@ -245,6 +262,68 @@ function fetchTestimonialsFresh(): Promise<Testimonial[] | null> {
       // broken payload, not "no reviews", so keep the bundle.
       if (data.length > 0 && items.length === 0) return null;
       cacheWrite('calaba:testimonials', items);
+      return items;
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** Same two-renderable-fields rule as `isTestimonial`, minus location/service. */
+function isTeamReview(t: unknown): t is TeamReview {
+  if (!t || typeof t !== 'object') return false;
+  const c = t as Partial<TeamReview>;
+  return (
+    typeof c.quote === 'string' &&
+    c.quote.trim().length > 0 &&
+    typeof c.attribution === 'string' &&
+    c.attribution.trim().length > 0 &&
+    typeof c.initials === 'string' &&
+    c.initials.trim().length > 0
+  );
+}
+
+/**
+ * Approved + consented STAFF reviews for the careers section.
+ *
+ * Identical contract to `getTestimonials`, and for the same reason:
+ *   `null` — never heard back. The caller renders no list.
+ *   `[]`   — answered, nobody has reviewed yet. The caller renders no list.
+ *
+ * Unlike the homepage there is no bundled fallback: inventing employee quotes
+ * would be a lie, so both failure modes render nothing. The "Leave a review"
+ * button lives OUTSIDE the list either way, so it survives all three states.
+ */
+export async function getTeamReviews(
+  signal?: AbortSignal,
+  onFresh?: (data: TeamReview[]) => void,
+): Promise<TeamReview[] | null> {
+  const cached = cacheRead<TeamReview[]>('calaba:teamReviews');
+  if (Array.isArray(cached)) {
+    if (onFresh) {
+      void fetchTeamReviewsFresh().then((fresh) => {
+        if (fresh && !signal?.aborted && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+          onFresh(fresh);
+        }
+      });
+    }
+    return cached;
+  }
+  const result = await fetchTeamReviewsFresh();
+  return signal?.aborted ? null : result;
+}
+
+function fetchTeamReviewsFresh(): Promise<TeamReview[] | null> {
+  return once('team-reviews', async () => {
+    try {
+      const data = await fetchJson<unknown>('/api/public/team-reviews');
+      if (!Array.isArray(data)) return null;
+      const items = data.filter(isTeamReview).map((t) => ({
+        ...t,
+        rating: clampRating(t.rating),
+      }));
+      if (data.length > 0 && items.length === 0) return null;
+      cacheWrite('calaba:teamReviews', items);
       return items;
     } catch {
       return null;

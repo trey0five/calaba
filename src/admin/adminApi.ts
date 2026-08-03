@@ -5,6 +5,7 @@ import type {
   AdminUser,
   ApplicationStatus,
   AuthUser,
+  ReviewAudience,
   ReviewDisplay,
   ReviewStatus,
   StaffMember,
@@ -82,8 +83,17 @@ export function changePassword(token: Token, currentPassword: string, newPasswor
 
 /* ---------------------------- reviews --------------------------- */
 
-export async function listReviews(token: Token): Promise<ListResult<AdminReview>> {
-  const data = await call<unknown>('/api/admin/reviews', token);
+/**
+ * Every review, both audiences. The server also accepts `?audience=family|staff`,
+ * but the screen segments the one loaded collection client-side so the tabs
+ * switch instantly and the nav badges cannot disagree with the list.
+ */
+export async function listReviews(
+  token: Token,
+  audience?: ReviewAudience,
+): Promise<ListResult<AdminReview>> {
+  const query = audience ? `?audience=${encodeURIComponent(audience)}` : '';
+  const data = await call<unknown>(`/api/admin/reviews${query}`, token);
   return { items: items<AdminReview>(data), counts: counts(data) };
 }
 

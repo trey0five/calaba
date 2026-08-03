@@ -23,6 +23,7 @@ import ServiceDialog from '@/components/ServiceDialog';
 import ArticleDialog from '@/components/ArticleDialog';
 import SkillDialog from '@/components/SkillDialog';
 import ReviewDialog from '@/components/ReviewDialog';
+import TeamReviewDialog from '@/components/TeamReviewDialog';
 import Careers from '@/components/sections/Careers';
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
       <ArticleDialog />
       <SkillDialog />
       <ReviewDialog />
+      <TeamReviewDialog />
     </DialogProvider>
   );
 }

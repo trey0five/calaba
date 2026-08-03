@@ -117,24 +117,35 @@ export default function Dashboard() {
   });
 
   const attention: AttentionItem[] = [
+    // Both audiences land here: a pending team review needs the owner's
+    // attention exactly as much as a pending family review does.
     ...reviews
       .filter((r) => r.status === 'pending')
-      .map((r) => ({
-        key: `rv-${r.id}`,
-        href: adminHref('reviews', undefined, { status: 'pending' }),
-        medallion: {
-          label:
-            r.submission.credit === 'Post anonymously'
-              ? '?'
-              : initialsOf(r.submission.name || r.display.attribution || '?'),
-          gradient: avatarGradient(r.id),
-        },
-        title: `${r.submission.rating || r.display.rating}★ review from ${
-          r.submission.credit === 'Post anonymously' ? 'Anonymous' : r.submission.name || 'a family'
-        }`,
-        sub: r.submission.headline || r.display.quote || '',
-        at: r.createdAt,
-      })),
+      .map((r) => {
+        const team = r.audience === 'staff';
+        const anonymous = team
+          ? r.submission.anonymous === true
+          : r.submission.credit === 'Post anonymously';
+        // The real name is admin-only, and the dashboard is admin-only.
+        const who = (team ? r.submission.fullName : r.submission.name) || '';
+        return {
+          key: `rv-${r.id}`,
+          href: adminHref('reviews', undefined, { status: 'pending' }),
+          medallion: {
+            label: team
+              ? r.display.initials || 'TM'
+              : anonymous
+                ? '?'
+                : initialsOf(who || r.display.attribution || '?'),
+            gradient: avatarGradient(r.id),
+          },
+          title: `${r.submission.rating || r.display.rating}★ ${team ? 'team ' : ''}review from ${
+            who || (anonymous ? 'Anonymous' : team ? 'a team member' : 'a family')
+          }`,
+          sub: r.submission.headline || r.display.quote || '',
+          at: r.createdAt,
+        };
+      }),
     ...applications
       .filter((a) => a.status === 'new')
       .map((a) => ({

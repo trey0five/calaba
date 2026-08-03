@@ -127,6 +127,8 @@ export type PanelChromeProps = HTMLMotionProps<'div'> & {
  * It is a `motion.div` so the existing dialogs can keep passing their
  * enter/exit props, and the admin drawers can slide with it.
  */
+const POSITIONED = /(?:^|\s)(?:absolute|fixed|sticky|static|relative)(?:\s|$)/;
+
 export const PanelChrome = forwardRef<HTMLDivElement, PanelChromeProps>(function PanelChrome(
   {
     className,
@@ -143,7 +145,14 @@ export const PanelChrome = forwardRef<HTMLDivElement, PanelChromeProps>(function
     <motion.div
       ref={ref}
       className={cn(
-        'relative overflow-hidden shadow-cosmic ring-1 ring-white/10',
+        // `relative` is only a DEFAULT. Tailwind emits `.relative` after
+        // `.absolute`, so hardcoding it here silently beat the Drawer's
+        // `absolute inset-y-0 right-0`: the panel lost its height constraint,
+        // the scrollable body grew past the viewport and the footer buttons
+        // became unreachable on short screens (and the drawer slid in from the
+        // left). Callers that position themselves must win.
+        !POSITIONED.test(className ?? '') && 'relative',
+        'overflow-hidden shadow-cosmic ring-1 ring-white/10',
         radiusClassName,
         className,
       )}

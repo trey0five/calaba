@@ -7,6 +7,7 @@ type DialogState =
   | { name: 'article'; articleId: string }
   | { name: 'skill'; skillId: string }
   | { name: 'review' }
+  | { name: 'teamReview' }
   | null;
 
 interface DialogContextValue {
@@ -55,6 +56,16 @@ export function useReview() {
   return {
     open: state?.name === 'review',
     openDialog: () => setState({ name: 'review' }),
+    closeDialog: () => setState(null),
+  };
+}
+
+/** Staff review of working here — surfaced from the careers section. */
+export function useTeamReview() {
+  const { state, setState } = useDialogs();
+  return {
+    open: state?.name === 'teamReview',
+    openDialog: () => setState({ name: 'teamReview' }),
     closeDialog: () => setState(null),
   };
 }
