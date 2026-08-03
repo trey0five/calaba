@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import Reveal, { RevealDirection } from '@/components/primitives/Reveal';
+import Reveal from '@/components/primitives/Reveal';
 import AuroraField from '@/components/primitives/AuroraField';
 import AuroraRibbon from '@/components/primitives/AuroraRibbon';
 import StaffCard from '@/components/primitives/StaffCard';
@@ -12,14 +12,14 @@ type Member = {
   src: string;
   name: string;
   title: string;
-  direction: RevealDirection;
   /** intrinsic size — prevents layout shift while the photo loads */
   w: number;
   h: number;
 };
 
-/** Reveal choreography by position, reused whatever the source of the data. */
-const DIRECTIONS: RevealDirection[] = ['left', 'scale', 'right'];
+/** Cards per row at the widest breakpoint. The entrance stagger resets on each
+ *  row so the last card is never more than a few frames behind the first. */
+const COLUMNS = 4;
 
 /** Bundled fallback — stays in the repo forever so the section renders with
  *  the API down, and is only replaced by a non-empty live roster. These are the
@@ -27,18 +27,26 @@ const DIRECTIONS: RevealDirection[] = ['left', 'scale', 'right'];
  *  composed card is identical to the artwork it replaces. */
 const TEAM: Member[] = (
   [
-    { src: 'head-audrey.webp', w: 600, h: 600, name: 'Audrey Tatum', title: 'Clinical Supervisor', direction: 'left' },
-    { src: 'head-geena.webp', w: 600, h: 600, name: 'Geena Roca', title: 'Lead RBT', direction: 'scale' },
-    { src: 'head-erick.webp', w: 600, h: 600, name: 'Erick Andrade', title: 'Lead RBT', direction: 'right' },
+    { src: 'head-audrey.webp', w: 600, h: 600, name: 'Audrey Tatum', title: 'Clinical Supervisor' },
+    { src: 'head-geena.webp', w: 600, h: 600, name: 'Geena Roca', title: 'Lead RBT' },
+    { src: 'head-erick.webp', w: 600, h: 600, name: 'Erick Andrade', title: 'Lead RBT' },
   ] as Member[]
 ).map((m) => ({ ...m, src: `${import.meta.env.BASE_URL}${m.src}` }));
 
 function MemberCard({ member, index }: { member: Member; index: number }) {
   return (
+    // Every card enters the same way. The previous choreography cycled
+    // left / scale / right per index, which meant that until the last card
+    // settled the row showed cards at 0.9 scale sitting beside cards at 1.0,
+    // shifted +/-60px into each other's gutters — the grid only looked
+    // symmetrical after the animation finished, and any card still below the
+    // fold stayed frozen in that state. A single vertical direction cannot
+    // change a card's width or its gutter, so the row is uniform at every
+    // frame, including the first paint.
     <Reveal
-      direction={member.direction}
-      delay={0.1 + index * 0.12}
-      scale={member.direction === 'scale' ? 0.9 : undefined}
+      direction="up"
+      distance={24}
+      delay={0.05 * (index % COLUMNS)}
       className="snap-center shrink-0 w-[80vw] md:w-auto md:shrink group flex flex-col h-full"
     >
       {/* The card IS the design now: headshot + frame + live text. StaffCard
@@ -50,10 +58,12 @@ function MemberCard({ member, index }: { member: Member; index: number }) {
         title={member.title}
         className="ring-1 ring-teal/20 shadow-glow-magenta transition-transform duration-300 group-hover:scale-[1.02]"
       />
-      {/* caption steps down at lg where the grid goes 4-up and each column
-          loses ~25% of its width — long titles ("Clinical Supervisor BCBA")
-          otherwise wrap to three lines and desync the row baselines */}
-      <div className="mt-5 text-center">
+      {/* Caption steps down at lg where the grid goes 4-up and each column
+          loses ~25% of its width. The min-height reserves room for a
+          two-line title ("Lead RBT / Student Analyst") so a row of short
+          titles is not visibly shorter than a row of long ones — otherwise
+          the gap between rows changes depending on who is hired. */}
+      <div className="mt-5 flex min-h-[4.75rem] flex-col items-center text-center">
         <h3 className="text-text-base font-bold text-xl lg:text-lg xl:text-xl">
           {member.name}
         </h3>
@@ -78,14 +88,13 @@ export default function Team() {
       // member was still awaiting a photo upload blanked the whole section.
       const next: Member[] = (staff.team || [])
         .filter((m) => m?.photo?.url && m.name)
-        .map((m, i) => ({
+        .map((m) => ({
           src: m.photo!.url,
           name: m.name,
           title: m.title,
           // keep the API's intrinsic size so the CLS reservation survives
           w: m.photo?.w ?? 900,
           h: m.photo?.h ?? 1125,
-          direction: DIRECTIONS[i % DIRECTIONS.length],
         }));
       if (next.length === 0) return;   // keep the bundled team
       setTeam(next);
