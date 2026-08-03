@@ -21,6 +21,7 @@ import ConsultationDialog from '@/components/ConsultationDialog';
 import ApplicationDialog from '@/components/ApplicationDialog';
 import ServiceDialog from '@/components/ServiceDialog';
 import ArticleDialog from '@/components/ArticleDialog';
+import SkillDialog from '@/components/SkillDialog';
 import ReviewDialog from '@/components/ReviewDialog';
 import Careers from '@/components/sections/Careers';
 
@@ -53,6 +54,7 @@ export default function App() {
       <ApplicationDialog />
       <ServiceDialog />
       <ArticleDialog />
+      <SkillDialog />
       <ReviewDialog />
     </DialogProvider>
   );

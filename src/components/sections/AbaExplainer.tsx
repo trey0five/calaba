@@ -1,48 +1,13 @@
-import { MessageCircle, UsersRound, Sparkles, LucideIcon } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import SectionShell from '@/components/primitives/SectionShell';
 import Reveal from '@/components/primitives/Reveal';
 import RevealGroup from '@/components/primitives/RevealGroup';
-
-type Card = {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-  /** medallion + underline fill */
-  gradient: string;
-  /** corner aura and hover shadow */
-  glow: string;
-  /** faint tint the card washes into on hover */
-  wash: string;
-};
-
-const cards: Card[] = [
-  {
-    icon: MessageCircle,
-    title: 'Communication',
-    body: 'Speech, AAC, and functional language that reaches real listeners.',
-    gradient: 'linear-gradient(135deg, #2FE0D8 0%, #0E5A56 100%)',
-    glow: 'rgba(34,199,192,0.45)',
-    wash: 'rgba(34,199,192,0.13)',
-  },
-  {
-    icon: UsersRound,
-    title: 'Social connection',
-    body: 'Peer play, friendship-building, and family interaction.',
-    gradient: 'linear-gradient(135deg, #FF6FB0 0%, #9C1F5B 100%)',
-    glow: 'rgba(214,51,122,0.42)',
-    wash: 'rgba(214,51,122,0.12)',
-  },
-  {
-    icon: Sparkles,
-    title: 'Daily living',
-    body: 'Self-care, routines, and independence at every age.',
-    gradient: 'linear-gradient(135deg, #FFC44D 0%, #B8451F 100%)',
-    glow: 'rgba(245,176,39,0.45)',
-    wash: 'rgba(245,176,39,0.14)',
-  },
-];
+import { SKILLS } from '@/content/skills';
+import { useSkillDialog } from '@/lib/dialogs';
 
 export default function AbaExplainer() {
+  const { openSkill } = useSkillDialog();
+
   return (
     <SectionShell id="aba" field="aba">
       <Reveal direction="up" className="mb-12 max-w-3xl">
@@ -65,7 +30,7 @@ export default function AbaExplainer() {
         data-auto-carousel
         className="flex items-stretch overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 -mx-6 px-6 pt-2 pb-4 mt-12 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:mx-0 md:px-0 md:pb-0 md:items-stretch"
       >
-        {cards.map((c) => (
+        {SKILLS.map((c) => (
           <Reveal
             key={c.title}
             variantsMode
@@ -75,11 +40,11 @@ export default function AbaExplainer() {
               ['--glow' as string]: c.glow,
               ['--wash' as string]: c.wash,
             }}
-            className="group snap-center shrink-0 w-[80vw] md:w-auto md:shrink self-stretch relative flex flex-col overflow-hidden rounded-[26px] bg-surface p-px shadow-card ring-1 ring-hair transition-[transform,box-shadow] duration-500 ease-out hover:-translate-y-2 hover:shadow-[0_32px_64px_-24px_var(--glow)]"
+            className="group cursor-pointer snap-center shrink-0 w-[80vw] md:w-auto md:shrink self-stretch relative flex flex-col overflow-hidden rounded-[26px] bg-surface p-px shadow-card ring-1 ring-hair transition-[transform,box-shadow] duration-500 ease-out hover:-translate-y-2 hover:shadow-[0_32px_64px_-24px_var(--glow)] focus-within:-translate-y-2 focus-within:shadow-[0_32px_64px_-24px_var(--glow)]"
           >
             {/* gradient hairline that only resolves on hover */}
             <span
-              className="pointer-events-none absolute inset-0 rounded-[26px] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+              className="pointer-events-none absolute inset-0 rounded-[26px] opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-within:opacity-100"
               style={{ background: 'var(--grad)' }}
               aria-hidden="true"
             />
@@ -121,6 +86,24 @@ export default function AbaExplainer() {
               />
 
               <p className="relative mt-4 text-[15px] leading-relaxed text-ink-muted">{c.body}</p>
+
+              {/* the button's ::after stretches over the whole card, so any
+                  part of the tile opens the dialog while the link keeps its
+                  accessible name and keyboard focus */}
+              <button
+                type="button"
+                onClick={() => openSkill(c.id)}
+                aria-label={`Learn more about ${c.title}`}
+                className="inline-flex items-center gap-1 text-teal-deep font-semibold mt-auto pt-4 pb-1 text-sm self-start outline-none after:absolute after:inset-0 after:z-10 after:content-['']"
+              >
+                <span className="relative inline-flex items-center gap-1">
+                  Learn more
+                  <ArrowRight
+                    size={16}
+                    className="transition-transform duration-300 group-hover:translate-x-1.5"
+                  />
+                </span>
+              </button>
             </div>
           </Reveal>
         ))}

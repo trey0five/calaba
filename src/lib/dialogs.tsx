@@ -5,6 +5,7 @@ type DialogState =
   | { name: 'application'; position?: string }
   | { name: 'service'; serviceId: string }
   | { name: 'article'; articleId: string }
+  | { name: 'skill'; skillId: string }
   | { name: 'review' }
   | null;
 
@@ -65,6 +66,18 @@ export function useArticleDialog() {
     articleId: state?.name === 'article' ? state.articleId : null,
     openArticle: (articleId: string) => setState({ name: 'article', articleId }),
     closeDialog: () => setState(null),
+    openConsultation: () => setState({ name: 'consultation' }),
+  };
+}
+
+export function useSkillDialog() {
+  const { state, setState } = useDialogs();
+  return {
+    open: state?.name === 'skill',
+    skillId: state?.name === 'skill' ? state.skillId : null,
+    openSkill: (skillId: string) => setState({ name: 'skill', skillId }),
+    closeDialog: () => setState(null),
+    /** hand off from a skill detail straight into booking */
     openConsultation: () => setState({ name: 'consultation' }),
   };
 }
