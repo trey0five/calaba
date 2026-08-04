@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
+  ChevronDown,
   GraduationCap,
   HeartHandshake,
   MapPin,
@@ -10,6 +11,7 @@ import {
   Users,
   LucideIcon,
 } from 'lucide-react';
+import { cn } from '@/lib/cn';
 import Reveal from '@/components/primitives/Reveal';
 import RevealGroup from '@/components/primitives/RevealGroup';
 import AuroraField, { SectionSeams } from '@/components/primitives/AuroraField';
@@ -80,17 +82,48 @@ const facts: { icon: LucideIcon; label: string }[] = [
 /** Reuses the role-card gradient vocabulary so the band belongs to this section. */
 const CARD_GRADIENTS = roles.map((r) => r.gradient);
 
+/** Lines of quote shown before the card clips. Long reviews are a good
+ *  problem to have, but one 400-word entry should not set the height of
+ *  every tile beside it. Written out rather than interpolated — Tailwind
+ *  scans source for literal class names, so `line-clamp-${n}` compiles to
+ *  no CSS at all and the clamp silently does nothing. */
+const CLAMP_CLASS = 'line-clamp-6';
+
 function TeamReviewCard({ review, index }: { review: TeamReview; index: number }) {
   const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+  const [expanded, setExpanded] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  const quoteRef = useRef<HTMLParagraphElement>(null);
+
+  // Whether the clamp is actually hiding anything is MEASURED, not guessed
+  // from character count: the same words wrap to a different number of lines
+  // in an 80vw carousel item than in a three-up grid column, so a length
+  // threshold would put "Read more" on cards that show their whole quote and
+  // omit it from cards that don't. Re-measured on resize for the same reason.
+  useEffect(() => {
+    const el = quoteRef.current;
+    if (!el) return;
+    // Skip while expanded — the clamp is off, so nothing overflows and the
+    // control that collapses the card would remove itself.
+    const measure = () => {
+      if (expanded) return;
+      setClipped(el.scrollHeight - el.clientHeight > 2);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [expanded, review.quote]);
+
   return (
     <div
       className="relative h-full overflow-hidden rounded-2xl p-[1.5px]"
       style={{ background: gradient }}
     >
-      <div className="relative flex h-full flex-col rounded-[15px] bg-ink-950/85 p-6 backdrop-blur-sm">
+      <div className="relative flex h-full flex-col rounded-[15px] bg-ink-950/85 p-5 backdrop-blur-sm">
         <Quote
-          size={34}
-          className="pointer-events-none absolute right-4 top-3 text-gold/20"
+          size={30}
+          className="pointer-events-none absolute right-3.5 top-2.5 text-gold/20"
           aria-hidden="true"
         />
         <div
@@ -99,13 +132,56 @@ function TeamReviewCard({ review, index }: { review: TeamReview; index: number }
           aria-label={`${review.rating} out of 5 stars`}
         >
           {Array.from({ length: review.rating }, (_, i) => (
-            <Star key={i} size={14} className="fill-gold text-gold" aria-hidden="true" />
+            <Star key={i} size={13} className="fill-gold text-gold" aria-hidden="true" />
           ))}
         </div>
-        <p className="mt-3 text-[15px] leading-relaxed text-text-light/90">{review.quote}</p>
-        <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
+
+        {/* min-height is exactly CLAMP lines of this type (6 x leading-relaxed
+            1.625 = 9.75em), so a two-line review and a clipped one occupy the
+            same box. Tiles then match each other WITHOUT the grid stretching
+            them, which is what lets one card expand on its own instead of
+            dragging its neighbours to the same height and leaving them mostly
+            empty. */}
+        <p
+          ref={quoteRef}
+          className={cn(
+            'mt-3 text-[14.5px] leading-relaxed text-text-light/90',
+            !expanded && `${CLAMP_CLASS} min-h-[9.75em]`,
+          )}
+        >
+          {review.quote}
+        </p>
+
+        {/* Rendered whether or not there is a control, so a clipped tile is not
+            one line taller than an unclipped one sitting beside it. */}
+        <div className="mt-2 flex h-6 items-center">
+          {clipped && (
+            // The ::after stretches over the whole tile so tapping anywhere
+            // toggles it, while the element itself stays a real button — it
+            // keeps an accessible name, keyboard focus and the expanded state.
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="inline-flex items-center gap-1 text-[13px] font-semibold text-teal-bright outline-none transition hover:text-teal-bright/80 after:absolute after:inset-0 after:z-10 after:cursor-pointer after:content-['']"
+            >
+              <span className="relative inline-flex items-center gap-1">
+                {expanded ? 'Show less' : 'Read more'}
+                <ChevronDown
+                  size={14}
+                  className={cn('transition-transform duration-300', expanded && 'rotate-180')}
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* mt-auto pins the attribution to the bottom, so tiles sharing a row
+            keep their footers on one line however short the quote is */}
+        <div className="mt-auto flex items-center gap-3 border-t border-white/10 pt-4">
           <span
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white ring-1 ring-white/20"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-white ring-1 ring-white/20"
             style={{ background: gradient }}
             aria-hidden="true"
           >
@@ -173,9 +249,21 @@ function TeamVoices() {
             </p>
           </Reveal>
 
-          <RevealGroup className="mt-9 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" stagger={0.09}>
+          {/* Swipeable, auto-advancing carousel below sm; a grid from sm up.
+              The negative margin lets it bleed past the section's px-6 so a
+              card can sit half off-screen and read as "there are more". */}
+          <RevealGroup
+            data-auto-carousel
+            className="mt-9 flex items-start gap-4 -mx-6 snap-x snap-mandatory overflow-x-auto scrollbar-hide px-6 pb-4 pt-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:items-start sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3"
+            stagger={0.09}
+          >
             {reviews.map((review, i) => (
-              <Reveal key={`${review.attribution}-${i}`} variantsMode direction="up">
+              <Reveal
+                key={`${review.attribution}-${i}`}
+                variantsMode
+                direction="up"
+                className="w-[82vw] shrink-0 snap-center sm:w-auto sm:shrink"
+              >
                 <TeamReviewCard review={review} index={i} />
               </Reveal>
             ))}
